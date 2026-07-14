@@ -113,10 +113,7 @@ Tips:
 
 ## Deployment
 
-A ready-made GitHub Pages workflow lives at `docs/github-pages-workflow.yml`
-(it could not be pushed under `.github/workflows/` because the access token
-used for this branch lacks the `workflow` scope). To enable auto-deploys:
-move it to `.github/workflows/deploy.yml`, commit, and set Pages → "GitHub
-Actions" in the repo settings. It builds and publishes `dist/` on every push
-to `main`. The Vite `base` is relative, so the build also runs from any
-static host or straight off the filesystem.
+`.github/workflows/deploy.yml` builds and publishes the app to GitHub Pages on
+every push to `main` (enable Pages → "GitHub Actions" in the repo settings).
+The Vite `base` is relative, so the build also runs from any static host or
+straight off the filesystem.
