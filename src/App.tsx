@@ -1,8 +1,17 @@
-import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { ChartSvg } from './ChartSvg'
 import { exportJson, exportPng, exportSvg } from './export'
 import { layoutChart } from './layout'
 import { deleteNode, duplicateNode, normalizeChart, type OrgChart } from './model'
+import { type Anchor, NodeToolbar } from './NodeToolbar'
 import { SidePanel } from './SidePanel'
 import { DEFAULT_TEMPLATE_KEY, templates } from './templates'
 
@@ -10,6 +19,16 @@ const STORAGE_KEY = 'astrion-org-chart-v1'
 const SIDEBAR_KEY = 'astrion-sidebar-width-v1'
 const SIDEBAR_MIN = 280
 const SIDEBAR_DEFAULT = 340
+const THEME_KEY = 'astrion-theme'
+
+type Theme = 'light' | 'dark'
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+
+/** The theme stamped on <html> by the no-FOUC bootstrap in index.html. */
+function readTheme(): Theme {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'
+}
 
 /** Largest the panel may grow to: never past ~760px, and always leaving room
  *  for the canvas next to it. */
@@ -43,9 +62,23 @@ export default function App() {
   const [history, setHistory] = useState<OrgChart[]>([])
   const [future, setFuture] = useState<OrgChart[]>([])
   const [sidebarWidth, setSidebarWidth] = useState<number>(loadSidebarWidth)
+  const [theme, setTheme] = useState<Theme>(readTheme)
+  const [anchor, setAnchor] = useState<Anchor | null>(null)
   const svgHostRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
+  const canvasWrapRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const tbWidthRef = useRef(216)
+  const rafRef = useRef(0)
+
+  const toggleTheme = useCallback(() => {
+    setTheme((t) => {
+      const next: Theme = t === 'dark' ? 'light' : 'dark'
+      document.documentElement.setAttribute('data-theme', next)
+      localStorage.setItem(THEME_KEY, next)
+      return next
+    })
+  }, [])
 
   const setChart = useCallback(
     (next: OrgChart) => {
@@ -165,6 +198,83 @@ export default function App() {
     })
   }, [selectedId, layout.placed])
 
+  // Position the floating contextual toolbar over the selected box. The
+  // .svg-host bounding rect already bakes in the zoom transform and scroll
+  // (transform-origin is top-left), so one measure maps SVG coords to screen.
+  const recomputeAnchor = useCallback(() => {
+    const host = svgHostRef.current
+    const canvas = canvasRef.current
+    const wrap = canvasWrapRef.current
+    if (!host || !canvas || !wrap || !selectedId) {
+      setAnchor(null)
+      return
+    }
+    const p = layout.placed.find((n) => n.node.id === selectedId)
+    if (!p) {
+      setAnchor(null)
+      return
+    }
+    const hostRect = host.getBoundingClientRect()
+    // .svg-host is scaled by `zoom` from its top-left origin, so hostRect's
+    // top-left is SVG coord (0,0) and `zoom` maps SVG units to screen px.
+    const z = zoom
+    const nodeL = hostRect.left + p.x * z
+    const nodeT = hostRect.top + p.y * z
+    const nodeW = p.w * z
+    const nodeH = p.totalH * z
+    const nodeCX = nodeL + nodeW / 2
+    const view = canvas.getBoundingClientRect()
+    // Hide when the box is scrolled outside the canvas viewport.
+    if (nodeL > view.right || nodeL + nodeW < view.left || nodeT > view.bottom || nodeT + nodeH < view.top) {
+      setAnchor(null)
+      return
+    }
+    const GAP = 10
+    const TB_H = 40
+    const M = 8
+    const tbW = tbWidthRef.current
+    const placement: Anchor['placement'] = nodeT - GAP - TB_H >= view.top + 4 ? 'above' : 'below'
+    const rawTop = placement === 'above' ? nodeT - GAP - TB_H : nodeT + nodeH + GAP
+    const wrapRect = wrap.getBoundingClientRect()
+    const centerVp = clamp(nodeCX, view.left + M + tbW / 2, view.right - M - tbW / 2)
+    const left = centerVp - wrapRect.left
+    const top = clamp(rawTop, view.top + M, view.bottom - M - TB_H) - wrapRect.top
+    const caretShift = clamp(nodeCX - wrapRect.left - left, -(tbW / 2 - 12), tbW / 2 - 12)
+    setAnchor({ left, top, placement, caretShift })
+  }, [selectedId, layout, zoom])
+
+  useLayoutEffect(() => {
+    recomputeAnchor()
+  }, [recomputeAnchor])
+
+  const scheduleReposition = useCallback(() => {
+    cancelAnimationFrame(rafRef.current)
+    rafRef.current = requestAnimationFrame(recomputeAnchor)
+  }, [recomputeAnchor])
+
+  useEffect(() => {
+    window.addEventListener('resize', scheduleReposition)
+    const ro = new ResizeObserver(scheduleReposition)
+    const el = canvasRef.current
+    if (el) ro.observe(el)
+    return () => {
+      window.removeEventListener('resize', scheduleReposition)
+      ro.disconnect()
+      cancelAnimationFrame(rafRef.current)
+    }
+  }, [scheduleReposition])
+
+  // Refine the toolbar width from its rendered size, then re-anchor once.
+  useEffect(() => {
+    const el = canvasWrapRef.current?.querySelector<HTMLElement>('.node-toolbar')
+    if (!el) return
+    const w = el.offsetWidth
+    if (w && Math.abs(w - tbWidthRef.current) > 1) {
+      tbWidthRef.current = w
+      scheduleReposition()
+    }
+  }, [anchor, scheduleReposition])
+
   const getSvg = () => svgHostRef.current?.querySelector('svg') as SVGSVGElement | null
 
   const loadTemplate = (key: string) => {
@@ -254,6 +364,30 @@ export default function App() {
             e.target.value = ''
           }}
         />
+
+        <span className="divider" />
+
+        <button
+          className="theme-toggle"
+          onClick={toggleTheme}
+          aria-pressed={theme === 'dark'}
+          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          title={theme === 'dark' ? 'Light theme' : 'Dark theme'}
+        >
+          {theme === 'dark' ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" />
+              <path
+                d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"
+                strokeLinecap="round"
+              />
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+            </svg>
+          )}
+        </button>
       </header>
 
       <div className="main">
@@ -273,28 +407,46 @@ export default function App() {
           onPointerDown={startResize}
           onDoubleClick={() => setSidebarWidth(SIDEBAR_DEFAULT)}
         />
-        <div className="canvas" ref={canvasRef} onClick={() => setSelectedId(null)}>
-          {layout.placed.length === 0 ? (
-            <div className="empty-state" onClick={(e) => e.stopPropagation()}>
-              <h2>Nothing to show yet</h2>
-              <p>This chart has no visible boxes. Start from a template, or add a box from the Boxes panel.</p>
-              <button
-                onClick={() => {
-                  setChart(defaultChart())
-                  setSelectedId(null)
-                }}
+        <div className="canvas-wrap" ref={canvasWrapRef}>
+          <div
+            className="canvas"
+            ref={canvasRef}
+            tabIndex={-1}
+            onScroll={scheduleReposition}
+            onClick={() => setSelectedId(null)}
+          >
+            {layout.placed.length === 0 ? (
+              <div className="empty-state" onClick={(e) => e.stopPropagation()}>
+                <h2>Nothing to show yet</h2>
+                <p>This chart has no visible boxes. Start from a template, or add a box from the Boxes panel.</p>
+                <button
+                  onClick={() => {
+                    setChart(defaultChart())
+                    setSelectedId(null)
+                  }}
+                >
+                  Start from a template
+                </button>
+              </div>
+            ) : (
+              <div
+                ref={svgHostRef}
+                className="svg-host"
+                style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
               >
-                Start from a template
-              </button>
-            </div>
-          ) : (
-            <div
-              ref={svgHostRef}
-              className="svg-host"
-              style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
-            >
-              <ChartSvg layout={layout} selectedId={selectedId} onSelect={setSelectedId} />
-            </div>
+                <ChartSvg layout={layout} selectedId={selectedId} onSelect={setSelectedId} />
+              </div>
+            )}
+          </div>
+          {selectedId && anchor && (
+            <NodeToolbar
+              anchor={anchor}
+              chart={chart}
+              nodeId={selectedId}
+              onChange={setChart}
+              onSelect={setSelectedId}
+              returnFocus={() => canvasRef.current?.focus()}
+            />
           )}
         </div>
       </div>

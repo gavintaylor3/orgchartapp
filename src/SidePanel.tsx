@@ -92,6 +92,7 @@ function NodeTree({ chart, selectedId, onSelect }: Omit<Props, 'onChange'>) {
         <button
           key={node.id}
           className={`tree-row${node.id === selectedId ? ' selected' : ''}`}
+          aria-current={node.id === selectedId ? 'true' : undefined}
           style={{ paddingLeft: 8 + depth * 14 }}
           onClick={() => onSelect(node.id)}
         >
@@ -481,10 +482,10 @@ export function SidePanel({ width, ...props }: Props & { width: number }) {
       className="side-panel"
       style={{ width, minWidth: width, maxWidth: width, fontSize: `${fontSize}px` }}
     >
-      <div className="tabs">
-        <button className={tab === 'build' ? 'active' : ''} onClick={() => setTab('build')}>Boxes</button>
-        <button className={tab === 'chart' ? 'active' : ''} onClick={() => setTab('chart')}>Chart</button>
-        <button className={tab === 'json' ? 'active' : ''} onClick={() => setTab('json')}>JSON</button>
+      <div className="tabs" role="tablist" aria-label="Editor sections">
+        <button role="tab" aria-selected={tab === 'build'} className={tab === 'build' ? 'active' : ''} onClick={() => setTab('build')}>Boxes</button>
+        <button role="tab" aria-selected={tab === 'chart'} className={tab === 'chart' ? 'active' : ''} onClick={() => setTab('chart')}>Chart</button>
+        <button role="tab" aria-selected={tab === 'json'} className={tab === 'json' ? 'active' : ''} onClick={() => setTab('json')}>JSON</button>
       </div>
       {tab === 'build' && (
         <>
