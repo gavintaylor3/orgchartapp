@@ -27,13 +27,13 @@ export function exportSvg(svgEl: SVGSVGElement, title: string): void {
   download(new Blob([svgMarkup(svgEl)], { type: 'image/svg+xml' }), `${safeName(title)}.svg`)
 }
 
-/** Rasterize the chart SVG to a PNG blob at the given scale. Returns the blob
- *  plus the chart's native (unscaled) pixel size, for callers that need the
- *  aspect ratio (e.g. PPTX slide placement). */
-export function svgToPngBlob(
+/** Rasterize the chart SVG onto a white canvas at the given scale. Returns the
+ *  canvas plus the chart's native (unscaled) pixel size, for callers that need
+ *  the aspect ratio or raw pixels (PPTX / PDF export). */
+export function svgToCanvas(
   svgEl: SVGSVGElement,
   scale: number,
-): Promise<{ blob: Blob; width: number; height: number }> {
+): Promise<{ canvas: HTMLCanvasElement; width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const width = svgEl.viewBox.baseVal.width || svgEl.clientWidth
     const height = svgEl.viewBox.baseVal.height || svgEl.clientHeight
@@ -54,10 +54,7 @@ export function svgToPngBlob(
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
       URL.revokeObjectURL(url)
-      canvas.toBlob((blob) => {
-        if (blob) resolve({ blob, width, height })
-        else reject(new Error('PNG encoding failed'))
-      }, 'image/png')
+      resolve({ canvas, width, height })
     }
     img.onerror = () => {
       URL.revokeObjectURL(url)
@@ -65,6 +62,22 @@ export function svgToPngBlob(
     }
     img.src = url
   })
+}
+
+/** Rasterize the chart SVG to a PNG blob plus its native size. */
+export function svgToPngBlob(
+  svgEl: SVGSVGElement,
+  scale: number,
+): Promise<{ blob: Blob; width: number; height: number }> {
+  return svgToCanvas(svgEl, scale).then(
+    ({ canvas, width, height }) =>
+      new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve({ blob, width, height })
+          else reject(new Error('PNG encoding failed'))
+        }, 'image/png')
+      }),
+  )
 }
 
 export function exportPng(svgEl: SVGSVGElement, title: string, scale: number): Promise<void> {
