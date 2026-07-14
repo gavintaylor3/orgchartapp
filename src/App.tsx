@@ -11,6 +11,7 @@ import { ChartSvg } from './ChartSvg'
 import { exportJson, exportPng, exportSvg } from './export'
 import { layoutChart } from './layout'
 import { deleteNode, duplicateNode, normalizeChart, type OrgChart } from './model'
+import { Minimap, type Viewport } from './Minimap'
 import { type Anchor, NodeToolbar } from './NodeToolbar'
 import { SidePanel } from './SidePanel'
 import { DEFAULT_TEMPLATE_KEY, templates } from './templates'
@@ -20,6 +21,11 @@ const SIDEBAR_KEY = 'astrion-sidebar-width-v1'
 const SIDEBAR_MIN = 280
 const SIDEBAR_DEFAULT = 340
 const THEME_KEY = 'astrion-theme'
+/** Matches the .canvas padding (var(--space-7)); the svg-host sits at this
+ *  offset inside the scroll content, so screen<->svg math needs it. */
+const CANVAS_PAD = 24
+const ZOOM_MIN = 0.25
+const ZOOM_MAX = 3
 
 type Theme = 'light' | 'dark'
 
@@ -64,12 +70,21 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState<number>(loadSidebarWidth)
   const [theme, setTheme] = useState<Theme>(readTheme)
   const [anchor, setAnchor] = useState<Anchor | null>(null)
+  const [viewport, setViewport] = useState<Viewport | null>(null)
+  const [spaceHeld, setSpaceHeld] = useState(false)
+  const [panning, setPanning] = useState(false)
   const svgHostRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const canvasWrapRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const tbWidthRef = useRef(216)
   const rafRef = useRef(0)
+  const pendingZoomRef = useRef<{ svgX: number; svgY: number; offX: number; offY: number } | null>(null)
+  const panRef = useRef<{ x: number; y: number; sl: number; st: number; moved: boolean } | null>(null)
+  const skipClickRef = useRef(false)
+  const lastSelRef = useRef<string | null>(null)
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
 
   const toggleTheme = useCallback(() => {
     setTheme((t) => {
@@ -249,14 +264,73 @@ export default function App() {
     setAnchor({ left, top, placement, caretShift })
   }, [selectedId, layout, zoom])
 
+  // The visible region of the chart, in SVG coordinates — drives the minimap.
+  const updateViewport = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    setViewport({
+      x: (canvas.scrollLeft - CANVAS_PAD) / zoom,
+      y: (canvas.scrollTop - CANVAS_PAD) / zoom,
+      w: canvas.clientWidth / zoom,
+      h: canvas.clientHeight / zoom,
+    })
+  }, [zoom])
+
+  // Ctrl/Cmd + wheel (and trackpad pinch) zooms toward the cursor. The point
+  // under the pointer is stashed and re-pinned after the zoom re-renders.
+  // Reads zoom from a ref and is stable ([] deps) so the native wheel listener
+  // subscribes once and always sees the current zoom + scroll (no drift).
+  const applyWheelZoom = useCallback((e: WheelEvent) => {
+    if (!(e.ctrlKey || e.metaKey)) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    e.preventDefault()
+    const z = zoomRef.current
+    const rect = canvas.getBoundingClientRect()
+    const offX = e.clientX - rect.left
+    const offY = e.clientY - rect.top
+    const svgX = (canvas.scrollLeft + offX - CANVAS_PAD) / z
+    const svgY = (canvas.scrollTop + offY - CANVAS_PAD) / z
+    // Normalize wheel delta across devices/browsers (Firefox reports lines).
+    const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? canvas.clientHeight : 1
+    const z2 = +clamp(z * Math.exp(-e.deltaY * unit * 0.0015), ZOOM_MIN, ZOOM_MAX).toFixed(3)
+    if (z2 === z) return
+    pendingZoomRef.current = { svgX, svgY, offX, offY }
+    zoomRef.current = z2
+    setZoom(z2)
+  }, [])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const handler = (e: WheelEvent) => applyWheelZoom(e)
+    canvas.addEventListener('wheel', handler, { passive: false })
+    return () => canvas.removeEventListener('wheel', handler)
+  }, [applyWheelZoom])
+
+  // Re-pin the cursor's SVG point after a wheel zoom. Runs before the anchor
+  // effect below so the toolbar reads the corrected scroll offset.
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current
+    const pend = pendingZoomRef.current
+    if (!canvas || !pend) return
+    pendingZoomRef.current = null
+    canvas.scrollLeft = CANVAS_PAD + pend.svgX * zoom - pend.offX
+    canvas.scrollTop = CANVAS_PAD + pend.svgY * zoom - pend.offY
+  }, [zoom])
+
   useLayoutEffect(() => {
     recomputeAnchor()
-  }, [recomputeAnchor])
+    updateViewport()
+  }, [recomputeAnchor, updateViewport])
 
   const scheduleReposition = useCallback(() => {
     cancelAnimationFrame(rafRef.current)
-    rafRef.current = requestAnimationFrame(recomputeAnchor)
-  }, [recomputeAnchor])
+    rafRef.current = requestAnimationFrame(() => {
+      recomputeAnchor()
+      updateViewport()
+    })
+  }, [recomputeAnchor, updateViewport])
 
   useEffect(() => {
     window.addEventListener('resize', scheduleReposition)
@@ -287,7 +361,14 @@ export default function App() {
   useEffect(() => {
     const host = svgHostRef.current
     const canvas = canvasRef.current
-    if (!host || !canvas || !selectedId) return
+    if (!host || !canvas || !selectedId) {
+      lastSelRef.current = selectedId
+      return
+    }
+    // Only recenter when the selection actually changes, not on every zoom
+    // (which would fight cursor-centered wheel zoom).
+    if (selectedId === lastSelRef.current) return
+    lastSelRef.current = selectedId
     const p = layout.placed.find((n) => n.node.id === selectedId)
     if (!p) return
     const hostRect = host.getBoundingClientRect()
@@ -331,6 +412,84 @@ export default function App() {
     }
     reader.readAsText(file)
   }
+
+  // Hold Space to pan (grab cursor). Bail on form fields and activatable
+  // controls so Space still types and still clicks focused buttons/links.
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || e.repeat) return
+      const t = e.target as HTMLElement
+      const tag = t.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON' || tag === 'A' || t.isContentEditable) return
+      e.preventDefault()
+      setSpaceHeld(true)
+    }
+    const up = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setSpaceHeld(false)
+    }
+    // Never let held-key/pan state survive a focus loss.
+    const reset = () => {
+      setSpaceHeld(false)
+      setPanning(false)
+      panRef.current = null
+    }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    window.addEventListener('blur', reset)
+    document.addEventListener('visibilitychange', reset)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', reset)
+      document.removeEventListener('visibilitychange', reset)
+    }
+  }, [])
+
+  // Drag to pan with Space+left or the middle mouse button.
+  const onCanvasPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const isPan = e.button === 1 || (e.button === 0 && spaceHeld)
+    const canvas = canvasRef.current
+    if (!isPan || !canvas) return
+    e.preventDefault()
+    panRef.current = { x: e.clientX, y: e.clientY, sl: canvas.scrollLeft, st: canvas.scrollTop, moved: false }
+    setPanning(true)
+    canvas.setPointerCapture(e.pointerId)
+  }
+  const onCanvasPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const pan = panRef.current
+    const canvas = canvasRef.current
+    if (!pan || !canvas) return
+    const dx = e.clientX - pan.x
+    const dy = e.clientY - pan.y
+    if (Math.abs(dx) + Math.abs(dy) > 3) pan.moved = true
+    canvas.scrollLeft = pan.sl - dx
+    canvas.scrollTop = pan.st - dy
+  }
+  const endPan = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!panRef.current) return
+    // Only the primary button produces a follow-up click to suppress.
+    if (panRef.current.moved && e.button === 0) skipClickRef.current = true
+    panRef.current = null
+    setPanning(false)
+    try {
+      canvasRef.current?.releasePointerCapture(e.pointerId)
+    } catch {
+      /* capture may already be gone on cancel */
+    }
+  }
+
+  // Scroll the canvas so an SVG point (from a minimap click) is centered.
+  const navigateTo = useCallback(
+    (svgX: number, svgY: number) => {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      canvas.scrollLeft = CANVAS_PAD + svgX * zoom - canvas.clientWidth / 2
+      canvas.scrollTop = CANVAS_PAD + svgY * zoom - canvas.clientHeight / 2
+    },
+    [zoom],
+  )
+
+  const canvasCursor = panning ? 'grabbing' : spaceHeld ? 'grab' : ''
 
   return (
     <div className="app">
@@ -443,11 +602,25 @@ export default function App() {
         />
         <div className="canvas-wrap" ref={canvasWrapRef}>
           <div
-            className="canvas"
+            className={`canvas${canvasCursor ? ` ${canvasCursor}` : ''}`}
             ref={canvasRef}
             tabIndex={-1}
             onScroll={scheduleReposition}
-            onClick={() => setSelectedId(null)}
+            onMouseDown={(e) => {
+              // Suppress the middle-button autoscroll puck.
+              if (e.button === 1) e.preventDefault()
+            }}
+            onPointerDown={onCanvasPointerDown}
+            onPointerMove={onCanvasPointerMove}
+            onPointerUp={endPan}
+            onPointerCancel={endPan}
+            onClick={() => {
+              if (skipClickRef.current) {
+                skipClickRef.current = false
+                return
+              }
+              setSelectedId(null)
+            }}
           >
             {layout.placed.length === 0 ? (
               <div className="empty-state" onClick={(e) => e.stopPropagation()}>
@@ -481,6 +654,9 @@ export default function App() {
               onSelect={setSelectedId}
               returnFocus={() => canvasRef.current?.focus()}
             />
+          )}
+          {layout.placed.length > 0 && viewport && (
+            <Minimap layout={layout} viewport={viewport} onNavigate={navigateTo} />
           )}
         </div>
       </div>
