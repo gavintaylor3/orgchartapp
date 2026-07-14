@@ -15,6 +15,7 @@ import {
   deleteNode,
   findNode,
   moveNode,
+  sanitizeColors,
   uid,
   updateNode,
 } from './model'
@@ -414,19 +415,7 @@ function ChartEditor({ chart, onChange, onSelect }: Props) {
       <fieldset>
         <legend>Astrion brand palette (locked)</legend>
         <div className="swatches">
-          {(
-            [
-              ['Force', palette.force],
-              ['Sky', palette.sky],
-              ['Refraction', palette.refraction],
-              ['Daylight', palette.daylight],
-              ['Zenith', palette.zenith],
-              ['Midnight', palette.midnight],
-              ['Supernova', palette.supernova],
-              ['Twilight', palette.twilight],
-              ['Water', palette.water],
-            ] as const
-          ).map(([label, color]) => (
+          {COLOR_SWATCHES.map(({ label, color }) => (
             <div key={label} className="swatch">
               <span style={{ background: color }} />
               <small>{label}<br />{color}</small>
@@ -467,7 +456,8 @@ function JsonEditor({ chart, onChange }: Pick<Props, 'chart' | 'onChange'>) {
               parsed.comms ??= []
               parsed.legend ??= []
               parsed.meta ??= { title: 'Org Chart', showTitle: true }
-              onChange(parsed)
+              // Enforce brand-only box colors even for hand-edited JSON.
+              onChange(sanitizeColors(parsed))
               setError(null)
             } catch (e) {
               setError(e instanceof Error ? e.message : 'Invalid JSON')
