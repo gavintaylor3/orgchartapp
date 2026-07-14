@@ -11,7 +11,7 @@ import { ChartSvg } from './ChartSvg'
 import { exportJson, exportPng, exportSvg } from './export'
 import { exportPdf } from './pdf'
 import { exportPptx } from './pptx'
-import { layoutChart } from './layout'
+import { layoutChart, previewDrag } from './layout'
 import { deleteNode, duplicateNode, normalizeChart, setNodePos, type OrgChart } from './model'
 import { Minimap, type Viewport } from './Minimap'
 import { type Anchor, NodeToolbar } from './NodeToolbar'
@@ -195,13 +195,14 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [undo, redo, selectedId, chart, setChart])
 
-  // While dragging, lay out a chart with the box at its live position so the
-  // box and its connectors track the pointer without touching undo history.
-  const displayChart = useMemo(
-    () => (drag ? setNodePos(chart, drag.id, { x: drag.x, y: drag.y }) : chart),
-    [chart, drag],
+  const layout = useMemo(() => layoutChart(chart), [chart])
+  // While dragging, derive a cheap preview from the committed layout (reusing
+  // untouched boxes by reference) so the drag stays smooth on large charts and
+  // never touches undo history. `view` is what gets rendered and measured.
+  const view = useMemo(
+    () => (drag ? previewDrag(chart, layout, drag.id, drag.x, drag.y) : layout),
+    [chart, layout, drag],
   )
-  const layout = useMemo(() => layoutChart(displayChart), [displayChart])
 
   // Zoom the whole chart to fit the visible canvas, then scroll to the origin.
   const fitToScreen = useCallback(() => {
@@ -245,7 +246,7 @@ export default function App() {
       setAnchor(null)
       return
     }
-    const p = layout.placed.find((n) => n.node.id === selectedId)
+    const p = view.placed.find((n) => n.node.id === selectedId)
     if (!p) {
       setAnchor(null)
       return
@@ -259,9 +260,9 @@ export default function App() {
     const nodeW = p.w * z
     const nodeH = p.totalH * z
     const nodeCX = nodeL + nodeW / 2
-    const view = canvas.getBoundingClientRect()
+    const vp = canvas.getBoundingClientRect()
     // Hide when the box is scrolled outside the canvas viewport.
-    if (nodeL > view.right || nodeL + nodeW < view.left || nodeT > view.bottom || nodeT + nodeH < view.top) {
+    if (nodeL > vp.right || nodeL + nodeW < vp.left || nodeT > vp.bottom || nodeT + nodeH < vp.top) {
       setAnchor(null)
       return
     }
@@ -269,15 +270,15 @@ export default function App() {
     const TB_H = 40
     const M = 8
     const tbW = tbWidthRef.current
-    const placement: Anchor['placement'] = nodeT - GAP - TB_H >= view.top + 4 ? 'above' : 'below'
+    const placement: Anchor['placement'] = nodeT - GAP - TB_H >= vp.top + 4 ? 'above' : 'below'
     const rawTop = placement === 'above' ? nodeT - GAP - TB_H : nodeT + nodeH + GAP
     const wrapRect = wrap.getBoundingClientRect()
-    const centerVp = clamp(nodeCX, view.left + M + tbW / 2, view.right - M - tbW / 2)
+    const centerVp = clamp(nodeCX, vp.left + M + tbW / 2, vp.right - M - tbW / 2)
     const left = centerVp - wrapRect.left
-    const top = clamp(rawTop, view.top + M, view.bottom - M - TB_H) - wrapRect.top
+    const top = clamp(rawTop, vp.top + M, vp.bottom - M - TB_H) - wrapRect.top
     const caretShift = clamp(nodeCX - wrapRect.left - left, -(tbW / 2 - 12), tbW / 2 - 12)
     setAnchor({ left, top, placement, caretShift })
-  }, [selectedId, layout, zoom])
+  }, [selectedId, view, zoom])
 
   // The visible region of the chart, in SVG coordinates — drives the minimap.
   const updateViewport = useCallback(() => {
@@ -514,6 +515,13 @@ export default function App() {
       let moved = false
       let curX = baseX
       let curY = baseY
+      // Coalesce moves to one render per frame so fast pointer streams (or a
+      // heavy chart) never build a render backlog.
+      let raf = 0
+      const flush = () => {
+        raf = 0
+        setDrag({ id, x: curX, y: curY })
+      }
       const onMove = (ev: PointerEvent) => {
         const dxPx = ev.clientX - startX
         const dyPx = ev.clientY - startY
@@ -529,12 +537,13 @@ export default function App() {
         const step = ev.altKey ? 1 : SNAP
         curX = Math.max(0, Math.round(nx / step) * step)
         curY = Math.max(0, Math.round(ny / step) * step)
-        setDrag({ id, x: curX, y: curY })
+        if (!raf) raf = requestAnimationFrame(flush)
       }
       const onUp = () => {
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
         window.removeEventListener('pointercancel', onUp)
+        if (raf) cancelAnimationFrame(raf)
         document.body.style.userSelect = ''
         document.body.style.cursor = ''
         draggingRef.current = false
@@ -716,7 +725,7 @@ export default function App() {
               setSelectedId(null)
             }}
           >
-            {layout.placed.length === 0 ? (
+            {view.placed.length === 0 ? (
               <div className="empty-state" onClick={(e) => e.stopPropagation()}>
                 <h2>Nothing to show yet</h2>
                 <p>This chart has no visible boxes. Start from a template, or add a box from the Boxes panel.</p>
@@ -736,7 +745,7 @@ export default function App() {
                 style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
               >
                 <ChartSvg
-                  layout={layout}
+                  layout={view}
                   selectedId={selectedId}
                   onSelect={selectNode}
                   onNodePointerDown={onNodePointerDown}
@@ -754,8 +763,8 @@ export default function App() {
               returnFocus={() => canvasRef.current?.focus()}
             />
           )}
-          {layout.placed.length > 0 && viewport && (
-            <Minimap layout={layout} viewport={viewport} onNavigate={navigateTo} />
+          {view.placed.length > 0 && viewport && (
+            <Minimap layout={view} viewport={viewport} onNavigate={navigateTo} />
           )}
         </div>
       </div>
