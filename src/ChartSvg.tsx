@@ -18,6 +18,8 @@ interface Props {
   onSelect?: (id: string) => void
   /** Begin a drag-to-reposition gesture on a box. */
   onNodePointerDown?: (id: string, e: ReactPointerEvent) => void
+  /** Accessible summary of the chart, announced to screen readers. */
+  ariaLabel?: string
 }
 
 function KeyIcon({ x, y, color }: { x: number; y: number; color: string }) {
@@ -286,7 +288,7 @@ function LegendMarkerGlyph({ marker, x, y }: { marker: LegendMarker; x: number; 
   }
 }
 
-export function ChartSvg({ layout, selectedId, onSelect, onNodePointerDown }: Props) {
+export function ChartSvg({ layout, selectedId, onSelect, onNodePointerDown, ariaLabel }: Props) {
   const { placed, connectors, zones, comms, legend, title, width, height } = layout
   return (
     <svg
@@ -295,6 +297,8 @@ export function ChartSvg({ layout, selectedId, onSelect, onNodePointerDown }: Pr
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       fontFamily={brand.fontFamily}
+      role="img"
+      aria-label={ariaLabel}
     >
       <defs>
         <marker id="commArrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto-start-reverse">

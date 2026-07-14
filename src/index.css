@@ -273,6 +273,7 @@ body,
 
 .canvas:focus-visible {
   outline: none;
+  box-shadow: inset var(--focus-ring);
 }
 
 .canvas.grab {
