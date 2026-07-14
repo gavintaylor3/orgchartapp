@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { ChartSvg } from './ChartSvg'
 import { exportJson, exportPng, exportSvg } from './export'
+import { exportPdf } from './pdf'
 import { exportPptx } from './pptx'
 import { layoutChart } from './layout'
 import { deleteNode, duplicateNode, normalizeChart, setNodePos, type OrgChart } from './model'
@@ -624,6 +625,9 @@ export default function App() {
         </button>
         <button onClick={() => { const svg = getSvg(); if (svg) void exportPptx(svg, chart.meta.title) }}>
           PPTX
+        </button>
+        <button onClick={() => { const svg = getSvg(); if (svg) void exportPdf(svg, chart.meta.title) }}>
+          PDF
         </button>
 
         <span className="divider" />
