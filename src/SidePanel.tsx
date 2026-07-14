@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type {
   BadgeType,
   LegendMarker,
@@ -66,8 +66,18 @@ const ZONE_STYLES: { value: ZoneStyle; label: string }[] = [
 
 function NodeTree({ chart, selectedId, onSelect }: Omit<Props, 'onChange'>) {
   const rows = allNodes(chart)
+  const treeRef = useRef<HTMLDivElement>(null)
+
+  // When the selection changes (e.g. a box was clicked in the chart), reveal
+  // its row in the tree so the left side always tracks the current node.
+  useEffect(() => {
+    if (!selectedId) return
+    const el = treeRef.current?.querySelector('.tree-row.selected')
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [selectedId])
+
   return (
-    <div className="tree">
+    <div className="tree" ref={treeRef}>
       {rows.map(({ node, depth }) => (
         <button
           key={node.id}
@@ -437,6 +447,13 @@ function JsonEditor({ chart, onChange }: Pick<Props, 'chart' | 'onChange'>) {
 
 export function SidePanel({ width, ...props }: Props & { width: number }) {
   const [tab, setTab] = useState<'build' | 'chart' | 'json'>('build')
+
+  // Selecting a box anywhere (including clicking it in the chart) jumps the
+  // panel to the Boxes tab so its editor and tree row are shown immediately.
+  useEffect(() => {
+    if (props.selectedId) setTab('build')
+  }, [props.selectedId])
+
   // Scale the panel's text with its width so a wider panel reads larger. Every
   // inner font size is defined in em, so they all track this single base.
   const fontSize = Math.min(18, Math.max(13, 14 + (width - 340) * 0.009))

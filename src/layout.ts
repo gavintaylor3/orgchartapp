@@ -310,9 +310,11 @@ const LEGEND_PAD = 12
 
 // textWidth() is deliberately generous so boxes never clip their text; that
 // padding is invisible inside a box, but the headline accent bar sits directly
-// under the rendered title, so scale the estimate down to track the actual
-// glyph run instead of overshooting past the last word.
-const TITLE_BAR_SCALE = 0.82
+// under the rendered title, so scale the estimate to track the rendered glyph
+// run. Kept close to 1 so the bar reaches the last word (Obvia, the brand
+// font, renders a touch wider than the Verdana-tuned estimate) without a
+// noticeable overshoot.
+const TITLE_BAR_SCALE = 0.9
 
 export function layoutChart(chart: OrgChart): Layout {
   const placed: PlacedNode[] = []
