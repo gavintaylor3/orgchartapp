@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { JSX, PointerEvent as ReactPointerEvent } from 'react'
 import { textWidth } from './layout'
 import type { Layout, PlacedNode } from './layout'
@@ -245,6 +246,12 @@ function NodeBox({
   )
 }
 
+/* Memoized so that during a drag (or selection change) only the boxes whose
+ * props actually changed re-render. previewDrag() reuses untouched PlacedNode
+ * objects by reference, and the callbacks are stable, so the shallow compare
+ * skips every box except the one being moved. */
+const MemoNodeBox = memo(NodeBox)
+
 function LegendMarkerGlyph({ marker, x, y }: { marker: LegendMarker; x: number; y: number }) {
   switch (marker) {
     case 'keyGold':
@@ -408,7 +415,7 @@ export function ChartSvg({ layout, selectedId, onSelect, onNodePointerDown }: Pr
       })}
 
       {placed.map((p) => (
-        <NodeBox
+        <MemoNodeBox
           key={p.node.id}
           p={p}
           selected={p.node.id === selectedId}

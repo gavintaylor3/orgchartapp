@@ -301,8 +301,14 @@ function subtreeIds(node: OrgNode): string[] {
   return out
 }
 
-function boxOf(placed: PlacedNode[], id: string): Rect | null {
-  const p = placed.find((n) => n.node.id === id)
+function indexById(placed: PlacedNode[]): Map<string, PlacedNode> {
+  const m = new Map<string, PlacedNode>()
+  for (const p of placed) m.set(p.node.id, p)
+  return m
+}
+
+function boxOf(byId: Map<string, PlacedNode>, id: string): Rect | null {
+  const p = byId.get(id)
   return p ? { x: p.x, y: p.y, w: p.w, h: p.totalH } : null
 }
 
@@ -353,28 +359,41 @@ const TITLE_BAR_SCALE = 0.9
 /** Shared tail: build zones, edges, legend, title, and bounds from already
  *  positioned boxes + connectors. Used by every layout strategy. */
 function assemble(chart: OrgChart, placed: PlacedNode[], connectors: string[]): Layout {
+  // Index once so zone/edge lookups are O(1) instead of scanning `placed`.
+  const byId = indexById(placed)
+
   // Zones behind member subtrees (computed from final screen rects).
   const zones: Zone[] = []
   for (const g of chart.groups) {
     const ids = new Set<string>()
     for (const memberId of g.memberIds) {
-      const node = placed.find((p) => p.node.id === memberId)?.node
+      const node = byId.get(memberId)?.node
       if (node) subtreeIds(node).forEach((i) => ids.add(i))
     }
-    const boxes = placed.filter((p) => ids.has(p.node.id))
-    if (!boxes.length) continue
-    const x1 = Math.min(...boxes.map((b) => b.x)) - M.zonePad
-    const y1 = Math.min(...boxes.map((b) => b.y)) - M.zonePad
-    const x2 = Math.max(...boxes.map((b) => b.x + b.w)) + M.zonePad
-    const y2 = Math.max(...boxes.map((b) => b.y + b.totalH)) + M.zonePad
-    zones.push({ group: g, rect: { x: x1, y: y1, w: x2 - x1, h: y2 - y1 } })
+    let x1 = Infinity
+    let y1 = Infinity
+    let x2 = -Infinity
+    let y2 = -Infinity
+    for (const id of ids) {
+      const b = byId.get(id)
+      if (!b) continue
+      x1 = Math.min(x1, b.x)
+      y1 = Math.min(y1, b.y)
+      x2 = Math.max(x2, b.x + b.w)
+      y2 = Math.max(y2, b.y + b.totalH)
+    }
+    if (x1 === Infinity) continue
+    zones.push({
+      group: g,
+      rect: { x: x1 - M.zonePad, y: y1 - M.zonePad, w: x2 - x1 + 2 * M.zonePad, h: y2 - y1 + 2 * M.zonePad },
+    })
   }
 
   // Edges (communication / graph connections).
   const comms: CommPath[] = []
   for (const link of chart.comms) {
-    const a = boxOf(placed, link.fromId)
-    const b = boxOf(placed, link.toId)
+    const a = boxOf(byId, link.fromId)
+    const b = boxOf(byId, link.toId)
     if (a && b) {
       const labelPos = {
         x: (a.x + a.w / 2 + b.x + b.w / 2) / 2,
@@ -448,6 +467,7 @@ function applyOverrides(placed: PlacedNode[]): boolean {
  *  swimlane), whose boxes are not in tidy-tree positions. Hidden containers
  *  draw no line, so their descendants connect to the nearest visible ancestor. */
 function hierarchyConnectors(chart: OrgChart, placed: PlacedNode[]): string[] {
+  const byId = indexById(placed)
   const parentOf = new Map<string, OrgNode | null>()
   visit(chart.roots, (n, parent) => parentOf.set(n.id, parent))
   const out: string[] = []
@@ -456,11 +476,23 @@ function hierarchyConnectors(chart: OrgChart, placed: PlacedNode[]): string[] {
     let anc = parentOf.get(n.id) ?? null
     while (anc && anc.variant === 'hidden') anc = parentOf.get(anc.id) ?? null
     if (!anc) return
-    const a = boxOf(placed, anc.id)
-    const b = boxOf(placed, n.id)
+    const a = boxOf(byId, anc.id)
+    const b = boxOf(byId, n.id)
     if (a && b) out.push(routeComm(a, b))
   })
   return out
+}
+
+/**
+ * Cheap drag preview: move one box within an already-computed layout and
+ * re-derive only the dependent geometry (connectors, zones, edges, bounds),
+ * reusing every untouched PlacedNode object by reference. This skips the
+ * per-move re-measure / re-layout and lets memoized boxes avoid re-rendering,
+ * so dragging stays smooth on large charts.
+ */
+export function previewDrag(chart: OrgChart, base: Layout, id: string, x: number, y: number): Layout {
+  const placed = base.placed.map((p) => (p.node.id === id ? { ...p, x, y } : p))
+  return assemble(chart, placed, hierarchyConnectors(chart, placed))
 }
 
 /* ------------------------------------------------------------- radial */
