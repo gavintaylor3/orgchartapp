@@ -1,4 +1,5 @@
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
@@ -560,6 +561,26 @@ export default function App() {
     [layout.placed, spaceHeld, chart, setChart],
   )
 
+  // Keyboard nudge: arrow keys move the selected box (Shift = 1px fine steps),
+  // giving keyboard users the manual-position capability that dragging provides.
+  const onCanvasKeyDown = useCallback(
+    (e: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (!selectedId || !e.key.startsWith('Arrow')) return
+      const p = layout.placed.find((n) => n.node.id === selectedId)
+      if (!p) return
+      e.preventDefault()
+      const step = e.shiftKey ? 1 : SNAP
+      let x = p.x
+      let y = p.y
+      if (e.key === 'ArrowLeft') x -= step
+      else if (e.key === 'ArrowRight') x += step
+      else if (e.key === 'ArrowUp') y -= step
+      else if (e.key === 'ArrowDown') y += step
+      setChart(setNodePos(chart, selectedId, { x: Math.max(0, x), y: Math.max(0, y) }))
+    },
+    [selectedId, layout.placed, chart, setChart],
+  )
+
   // Box clicks select — unless the click is the tail of a drag that moved.
   const selectNode = useCallback((id: string) => {
     if (nodeMovedRef.current) {
@@ -599,6 +620,7 @@ export default function App() {
         <select
           className="template-select"
           value=""
+          aria-label="Load a template"
           onChange={(e) => e.target.value && loadTemplate(e.target.value)}
         >
           <option value="">New from template…</option>
@@ -701,8 +723,10 @@ export default function App() {
           <div
             className={`canvas${canvasCursor ? ` ${canvasCursor}` : ''}`}
             ref={canvasRef}
-            tabIndex={-1}
+            tabIndex={0}
+            aria-label="Chart canvas. Select a box, then use arrow keys to move it (hold Shift for fine steps). Hold Space and drag to pan."
             onScroll={scheduleReposition}
+            onKeyDown={onCanvasKeyDown}
             onMouseDown={(e) => {
               // Suppress the middle-button autoscroll puck.
               if (e.button === 1) e.preventDefault()
@@ -749,6 +773,7 @@ export default function App() {
                   selectedId={selectedId}
                   onSelect={selectNode}
                   onNodePointerDown={onNodePointerDown}
+                  ariaLabel={`${chart.meta.title || 'Organization'} org chart, ${view.placed.length} ${view.placed.length === 1 ? 'box' : 'boxes'}`}
                 />
               </div>
             )}

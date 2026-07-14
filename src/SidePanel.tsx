@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type {
   BadgeType,
   CommLink,
@@ -111,6 +112,16 @@ const COLOR_SWATCHES: { label: string; color: string }[] = Object.entries(palett
 function NodeTree({ chart, selectedId, onSelect }: Omit<Props, 'onChange'>) {
   const rows = allNodes(chart)
   const treeRef = useRef<HTMLDivElement>(null)
+  const selIdx = rows.findIndex((r) => r.node.id === selectedId)
+  // Roving tabindex: exactly one row is tabbable, and arrow keys move focus.
+  const [focusIdx, setFocusIdx] = useState(0)
+  // Clamp so a row stays tabbable even after the tree shrinks (e.g. a delete).
+  const activeIdx = Math.min(focusIdx, rows.length - 1)
+
+  // Track the current selection as the roving-focus row.
+  useEffect(() => {
+    if (selIdx >= 0) setFocusIdx(selIdx)
+  }, [selIdx])
 
   // When the selection changes (e.g. a box was clicked in the chart), reveal
   // its row in the tree so the left side always tracks the current node.
@@ -120,15 +131,32 @@ function NodeTree({ chart, selectedId, onSelect }: Omit<Props, 'onChange'>) {
     el?.scrollIntoView({ block: 'nearest' })
   }, [selectedId])
 
+  const focusRow = (i: number) => {
+    const clamped = Math.max(0, Math.min(rows.length - 1, i))
+    setFocusIdx(clamped)
+    treeRef.current?.querySelectorAll<HTMLButtonElement>('.tree-row')[clamped]?.focus()
+  }
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowDown') focusRow(focusIdx + 1)
+    else if (e.key === 'ArrowUp') focusRow(focusIdx - 1)
+    else if (e.key === 'Home') focusRow(0)
+    else if (e.key === 'End') focusRow(rows.length - 1)
+    else return
+    e.preventDefault()
+  }
+
   return (
-    <div className="tree" ref={treeRef}>
-      {rows.map(({ node, depth }) => (
+    <div className="tree" role="tree" aria-label="Chart boxes" ref={treeRef} onKeyDown={onKeyDown}>
+      {rows.map(({ node, depth }, i) => (
         <button
           key={node.id}
+          role="treeitem"
+          aria-level={depth + 1}
+          aria-selected={node.id === selectedId}
           className={`tree-row${node.id === selectedId ? ' selected' : ''}`}
-          aria-current={node.id === selectedId ? 'true' : undefined}
+          tabIndex={i === activeIdx ? 0 : -1}
           style={{ paddingLeft: 8 + depth * 14 }}
-          onClick={() => onSelect(node.id)}
+          onClick={() => { setFocusIdx(i); onSelect(node.id) }}
         >
           <span
             className={`dot dot-${node.variant}`}
@@ -348,6 +376,7 @@ function ChartEditor({ chart, onChange, onSelect }: Props) {
               />
               <select
                 value={g.style}
+                aria-label="Zone style"
                 onChange={(e) => {
                   const groups = clone(chart.groups)
                   groups[gi] = { ...groups[gi], style: e.target.value as ZoneStyle }
@@ -403,11 +432,11 @@ function ChartEditor({ chart, onChange, onSelect }: Props) {
           return (
             <div key={c.id} className="card">
               <div className="detail-row">
-                <select value={c.fromId} onChange={(e) => patchEdge({ fromId: e.target.value })}>
+                <select value={c.fromId} aria-label="Edge from" onChange={(e) => patchEdge({ fromId: e.target.value })}>
                   {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
                 </select>
                 <span className="arrow">→</span>
-                <select value={c.toId} onChange={(e) => patchEdge({ toId: e.target.value })}>
+                <select value={c.toId} aria-label="Edge to" onChange={(e) => patchEdge({ toId: e.target.value })}>
                   {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
                 </select>
                 <button
@@ -416,10 +445,10 @@ function ChartEditor({ chart, onChange, onSelect }: Props) {
                 >×</button>
               </div>
               <div className="two-col">
-                <select value={c.style ?? 'solid'} onChange={(e) => patchEdge({ style: e.target.value as EdgeStyle })}>
+                <select value={c.style ?? 'solid'} aria-label="Edge line style" onChange={(e) => patchEdge({ style: e.target.value as EdgeStyle })}>
                   {EDGE_STYLES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
-                <select value={edgeArrow(c)} onChange={(e) => patchEdge({ arrow: e.target.value as EdgeArrow })}>
+                <select value={edgeArrow(c)} aria-label="Edge arrows" onChange={(e) => patchEdge({ arrow: e.target.value as EdgeArrow })}>
                   {EDGE_ARROWS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
                 </select>
               </div>
@@ -451,6 +480,7 @@ function ChartEditor({ chart, onChange, onSelect }: Props) {
           <div key={l.id} className="detail-row">
             <select
               value={l.marker}
+              aria-label="Legend marker"
               onChange={(e) => {
                 const legend = clone(chart.legend)
                 legend[li] = { ...legend[li], marker: e.target.value as LegendMarker }
@@ -513,7 +543,7 @@ function JsonEditor({ chart, onChange }: Pick<Props, 'chart' | 'onChange'>) {
       <p className="hint">
         The full chart definition. Save this JSON with your proposal to reproduce the chart exactly.
       </p>
-      <textarea className="json" rows={24} value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} />
+      <textarea className="json" rows={24} value={text} aria-label="Chart JSON" onChange={(e) => setText(e.target.value)} spellCheck={false} />
       {error && <p className="error">{error}</p>}
       <div className="btn-row">
         <button
