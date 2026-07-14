@@ -74,17 +74,32 @@ const IconTrash = () => (
 export function NodeToolbar({ anchor, chart, nodeId, onChange, onSelect, returnFocus }: Props) {
   const node = findNode(chart, nodeId)
   const rootRef = useRef<HTMLDivElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [focusIdx, setFocusIdx] = useState(0)
+  const [popFocusIdx, setPopFocusIdx] = useState(0)
   const wantFocusRef = useRef(false)
 
   const isSoleRoot = chart.roots.length === 1 && chart.roots[0].id === nodeId
+  const focusColorBtn = () => rootRef.current?.querySelector<HTMLButtonElement>('.tb-color')?.focus()
 
   // Reset transient UI whenever the selected node changes.
   useEffect(() => {
     setPopoverOpen(false)
     setFocusIdx(0)
   }, [nodeId])
+
+  // When the color popover opens, move focus onto the current (or first) swatch.
+  useEffect(() => {
+    if (!popoverOpen) return
+    const checked = COLOR_SWATCHES.findIndex((s) => s.color === node?.color)
+    const idx = checked >= 0 ? checked : COLOR_SWATCHES.length
+    setPopFocusIdx(idx)
+    const id = requestAnimationFrame(() => {
+      popRef.current?.querySelectorAll<HTMLButtonElement>('.tb-sw')[idx]?.focus()
+    })
+    return () => cancelAnimationFrame(id)
+  }, [popoverOpen, node?.color])
 
   // After an add/duplicate, move focus to the first toolbar button on the
   // re-anchored toolbar so keyboard users stay in place.
@@ -114,6 +129,12 @@ export function NodeToolbar({ anchor, chart, nodeId, onChange, onSelect, returnF
     onSelect(r.newId)
   }
 
+  const applyColor = (color?: string) => {
+    onChange(updateNode(chart, nodeId, { color }))
+    setPopoverOpen(false)
+    focusColorBtn()
+  }
+
   const buttons = [
     { key: 'child', label: 'Add child', icon: <IconChild />, onClick: () => act(() => addChild(chart, nodeId)) },
     { key: 'sibling', label: 'Add sibling', icon: <IconSibling />, onClick: () => act(() => addSibling(chart, nodeId)) },
@@ -135,9 +156,15 @@ export function NodeToolbar({ anchor, chart, nodeId, onChange, onSelect, returnF
   ]
 
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    // Let the color popover handle its own keys when it owns focus.
+    if (popoverOpen && popRef.current?.contains(e.target as Node)) return
     if (e.key === 'Escape') {
-      if (popoverOpen) setPopoverOpen(false)
-      else returnFocus()
+      if (popoverOpen) {
+        setPopoverOpen(false)
+        focusColorBtn()
+      } else {
+        returnFocus()
+      }
       return
     }
     const enabled = buttons.map((b, i) => (b.disabled ? -1 : i)).filter((i) => i >= 0)
@@ -152,6 +179,26 @@ export function NodeToolbar({ anchor, chart, nodeId, onChange, onSelect, returnF
     const target = enabled[ni]
     setFocusIdx(target)
     rootRef.current?.querySelectorAll<HTMLButtonElement>('.tb-btn')[target]?.focus()
+  }
+
+  const onPopKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const count = COLOR_SWATCHES.length + 1
+    if (e.key === 'Escape') {
+      e.stopPropagation()
+      setPopoverOpen(false)
+      focusColorBtn()
+      return
+    }
+    let ni = popFocusIdx
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') ni = (popFocusIdx + 1) % count
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ni = (popFocusIdx - 1 + count) % count
+    else if (e.key === 'Home') ni = 0
+    else if (e.key === 'End') ni = count - 1
+    else return
+    e.preventDefault()
+    e.stopPropagation()
+    setPopFocusIdx(ni)
+    popRef.current?.querySelectorAll<HTMLButtonElement>('.tb-sw')[ni]?.focus()
   }
 
   const style = {
@@ -196,21 +243,25 @@ export function NodeToolbar({ anchor, chart, nodeId, onChange, onSelect, returnF
       ))}
 
       {popoverOpen && (
-        <div className="tb-colorpop" role="radiogroup" aria-label="Box color">
-          {COLOR_SWATCHES.map(({ label, color }) => (
+        <div
+          ref={popRef}
+          className="tb-colorpop"
+          role="radiogroup"
+          aria-label="Box color"
+          onKeyDown={onPopKeyDown}
+        >
+          {COLOR_SWATCHES.map(({ label, color }, i) => (
             <button
               key={color}
               className="tb-sw"
               type="button"
               role="radio"
               aria-checked={node.color === color}
+              tabIndex={i === popFocusIdx ? 0 : -1}
               aria-label={label}
               title={label}
               style={{ background: color }}
-              onClick={() => {
-                onChange(updateNode(chart, nodeId, { color }))
-                setPopoverOpen(false)
-              }}
+              onClick={() => applyColor(color)}
             />
           ))}
           <button
@@ -218,12 +269,10 @@ export function NodeToolbar({ anchor, chart, nodeId, onChange, onSelect, returnF
             type="button"
             role="radio"
             aria-checked={!node.color}
+            tabIndex={popFocusIdx === COLOR_SWATCHES.length ? 0 : -1}
             aria-label="Use style color"
             title="Use style color"
-            onClick={() => {
-              onChange(updateNode(chart, nodeId, { color: undefined }))
-              setPopoverOpen(false)
-            }}
+            onClick={() => applyColor(undefined)}
           >
             ×
           </button>

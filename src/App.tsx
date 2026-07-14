@@ -164,6 +164,7 @@ export default function App() {
         e.preventDefault()
         setChart(deleteNode(chart, selectedId))
         setSelectedId(null)
+        canvasRef.current?.focus()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -191,10 +192,15 @@ export default function App() {
     if (!p) return
     const z = +Math.max(0.5, Math.min(2, Math.min((el.clientWidth * 0.55) / p.w, (el.clientHeight * 0.55) / p.totalH))).toFixed(2)
     setZoom(z)
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
     requestAnimationFrame(() => {
       const cx = 24 + (p.x + p.w / 2) * z
       const cy = 24 + (p.y + p.totalH / 2) * z
-      el.scrollTo({ left: cx - el.clientWidth / 2, top: cy - el.clientHeight / 2, behavior: 'smooth' })
+      el.scrollTo({
+        left: cx - el.clientWidth / 2,
+        top: cy - el.clientHeight / 2,
+        behavior: smooth ? 'smooth' : 'auto',
+      })
     })
   }, [selectedId, layout.placed])
 
@@ -274,6 +280,34 @@ export default function App() {
       scheduleReposition()
     }
   }, [anchor, scheduleReposition])
+
+  // Keep the selected box on screen (e.g. a freshly added child): if it sits
+  // outside the canvas viewport, gently scroll it in. This also keeps the
+  // floating toolbar mounted so its focus handling can run.
+  useEffect(() => {
+    const host = svgHostRef.current
+    const canvas = canvasRef.current
+    if (!host || !canvas || !selectedId) return
+    const p = layout.placed.find((n) => n.node.id === selectedId)
+    if (!p) return
+    const hostRect = host.getBoundingClientRect()
+    const nodeL = hostRect.left + p.x * zoom
+    const nodeT = hostRect.top + p.y * zoom
+    const nodeR = nodeL + p.w * zoom
+    const nodeB = nodeT + p.totalH * zoom
+    const view = canvas.getBoundingClientRect()
+    const pad = 52
+    let dx = 0
+    let dy = 0
+    if (nodeL < view.left + pad) dx = nodeL - (view.left + pad)
+    else if (nodeR > view.right - pad) dx = nodeR - (view.right - pad)
+    if (nodeT < view.top + pad) dy = nodeT - (view.top + pad)
+    else if (nodeB > view.bottom - pad) dy = nodeB - (view.bottom - pad)
+    if (dx || dy) {
+      const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      canvas.scrollBy({ left: dx, top: dy, behavior: smooth ? 'smooth' : 'auto' })
+    }
+  }, [selectedId, layout, zoom])
 
   const getSvg = () => svgHostRef.current?.querySelector('svg') as SVGSVGElement | null
 
