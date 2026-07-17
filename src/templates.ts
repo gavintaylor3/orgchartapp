@@ -699,8 +699,8 @@ function executiveLeadership(): OrgChart {
         width: 230,
         children: [
           node({ title: 'Tina Miller', name: 'Executive Assistant', variant: 'secondary', photo: true, width: 175 }),
-          node({ title: 'Pete Nguyen', name: 'President, Mission Solutions', variant: 'secondary', photo: true, width: 190 }),
-          node({ title: 'Lynn Doherty', name: 'President', variant: 'secondary', photo: true, width: 175 }),
+          node({ title: 'Eric Brown', name: 'President, Mission Solutions', variant: 'secondary', photo: true, width: 190 }),
+          node({ title: 'Conn Doherty', name: 'President, Strategy, Platform and Growth', variant: 'secondary', photo: true, width: 200 }),
           chief('Julia Donley', 'Chief Contracts Officer'),
           chief('Adam Omar', 'Chief Financial Officer'),
           chief('Jennifer Damewood', 'Chief Business Operations Officer'),
@@ -787,22 +787,30 @@ function spaceWarfighting(): OrgChart {
 
 /** Astrion 4 — Exploration & Lunar Presence. */
 function explorationLunar(): OrgChart {
+  const port = (name: string, role: string, refs: string[], width = 168): OrgNode =>
+    pillarBox(name, role, { width, bullets: refs })
+  // Two specialty portfolios each carry a subordinate executive box.
+  const davidWalker = port('David Walker', 'Specialty Engineering Systems', ['ESSCA 330K', 'USA'], 176)
+  davidWalker.children = [pillarBox('Paul Hastings', 'Technical Specialty Executive', { width: 176 })]
+  const jonSharpe = port('Jon Sharpe', 'Civil Space Engineering', [
+    'METTS III', 'ESSCA I', 'CPSS PP&C', 'MOSSI', 'SLS/Boeing', 'RSES LaRC', 'SMAEC',
+  ], 176)
+  jonSharpe.children = [pillarBox('Terry Quick', 'JSC Teammate Principal (SMAEC)', { width: 176 })]
+
   return pillarChart({
     title: 'Exploration & Lunar Presence Organizational Structure',
     leader: leaderBox('Lisa Watson-Morgan', 'EVP, Exploration & Lunar Presence', 260),
-    leads: [leadBox('Ianthi Burke', 'Solutions Lead'), leadBox('Genevieve Bartlett', 'Campaign Lead')],
+    leads: [leadBox('Gerrit Burke', 'Solutions Lead'), leadBox('Genevieve Burkett', 'Campaign Lead / BDE', true)],
     portfolios: [
-      pillarBox('Dustin Lore', 'Lunar'),
-      pillarBox('Sofia Harris', 'Civil / ISS'),
-      pillarBox('Todd Small', 'Human Landing Systems'),
-      pillarBox('Matt Nugent', 'SLS'),
-      pillarBox('James Charlton / Andrea Nascal', 'Research & Development Engineering', { width: 178 }),
-      pillarBox('Tarek Walton', 'Specialty Engineering Systems', { width: 172 }),
-      pillarBox('Sue Morgan', 'Civil Space Engineering'),
-    ],
-    tail: [
-      pillarBox('Paul Hastings', 'Technical Specialty Executive', { width: 172 }),
-      pillarBox('Terry Quick', 'SLS Teammate Principal (MSFC)', { width: 172 }),
+      port('Dustin Lore', 'Comet', ['COMET']),
+      port('Sofia Harvie', 'JSC Engineering JETS', ['JETS2', 'REMIS 2']),
+      port('Todd Shull', 'Product Development Center Systems', ['PSSC', 'PDC', 'SHARP'], 176),
+      port('Matt Nugent', 'LASSO', ['LASSO']),
+      port('James Chartres / Andrea Nazzal', 'Research & Development Engineering', [
+        'ARC', 'PESS II', 'ASSESS', 'ISDRS', 'LTA',
+      ], 188),
+      davidWalker,
+      jonSharpe,
     ],
   })
 }
@@ -883,15 +891,15 @@ function criticalInfrastructure(): OrgChart {
   return pillarChart({
     title: 'Critical Infrastructure Protection Organizational Structure',
     leader: leaderBox('Jeff Wehner', 'EVP, Critical Infrastructure Protection', 290),
-    leads: [leadBox('TBD', 'Solutions Lead'), leadBox('TBD', 'Campaign Lead')],
+    leads: [leadBox('TBD', 'Solutions Lead'), leadBox('TBD', 'Campaign Lead', true)],
     portfolios: [
       pillarBox('Anetra Withers', 'Transportation', {
         width: 185,
-        bullets: ['FAA PSS', 'IMA T5SS', 'SETI3', 'DSS3', 'Leidos MISC IV'],
+        bullets: ['FAA PSS', 'JMA TSSI', 'SETIS IDIQ', 'Leidos NISC IV'],
       }),
       pillarBox('Tom Evans (A)', 'Energy', {
         width: 185,
-        bullets: ['NRC CPSO', 'NRC CSRPDSS', 'DHS OIG SCAS'],
+        bullets: ['NRC CPSS', 'NRC CSRPDSS', 'DHS OIG SCAS'],
       }),
       pillarBox('TBD', 'Defense Industrial Base', { width: 185 }),
     ],
@@ -900,21 +908,30 @@ function criticalInfrastructure(): OrgChart {
 
 /** Astrion 9 — SPG organization. */
 function spg(): OrgChart {
-  // Functional VPs reporting into the operating org (grouped under the SVP;
-  // the reference chart shows these as two rows below the senior leaders).
-  const functionalVps: OrgNode[] = [
-    pillarBox('Rob Dumont', 'VP, Campaigns'),
-    pillarBox('Jason Nolledo', 'VP, Business Development', { width: 168 }),
-    pillarBox('Peter Mirniha', 'VP'),
-    pillarBox('Helene Coulard', 'VP, Proposals'),
-    pillarBox('Christine Fuentes', 'VP, Marketing & Communications', { width: 172 }),
-    pillarBox('Kristin Sotak', 'VP, Contracts'),
-    pillarBox('Scott Kray', 'VP'),
-    pillarBox('Bobby Brown', 'VP, Analytics'),
-    pillarBox('James Downs', 'VP'),
-    pillarBox('Logan Palmer', 'VP, Campaigns'),
-    pillarBox('Genevieve Bartlett', 'VP, Campaign Lead', { width: 168 }),
-    pillarBox('TBD', 'VP'),
+  const senior = (name: string, role: string): OrgNode =>
+    node({ title: name, name: role, variant: 'secondary', photo: true, width: 188 })
+  const vp = (name: string, role: string): OrgNode =>
+    pillarBox(name, role, { width: 170, photo: true })
+
+  // Tier 3 — functional VPs; tier 4 — business-development (BDE) VPs. The
+  // reference chart shows these as two rows below the senior leaders; the exact
+  // reporting is approximate and meant to be adjusted per use.
+  const functional: OrgNode[] = [
+    vp('Rob Dumont', 'SVP, Campaigns Lead'),
+    vp('Jason Galindo', 'VP, LCMWC Campaign Lead'),
+    vp('Peter Weilbach', 'VP, Capture'),
+    vp('Helene Courard', 'VP, Proposals'),
+    vp('Christine Fuentes', 'VP, Marketing and Communications'),
+    vp('Kristin Estok', 'VP, Business Operations'),
+  ]
+  const bde: OrgNode[] = [
+    vp('Scott King', 'VP, Army BDE'),
+    vp('Bobby Brown', 'VP, Navy/MDA BDE'),
+    vp('James Dennis', 'VP, USAF BDE'),
+    vp('Logan Palmer', 'VP, NSS BDE / Campaign Lead'),
+    vp('Genevieve Burkett', 'VP, E&LP BDE / Campaign Lead'),
+    node({ title: 'TBD', name: 'VP, FedCiv BDE / Campaign Lead', variant: 'tertiary', width: 170 }),
+    node({ title: 'TBA', name: 'VP, International BDE', variant: 'tertiary', width: 170 }),
   ]
   const advisorBoard = node({
     title: 'Industry Advisor Board',
@@ -930,32 +947,27 @@ function spg(): OrgChart {
     ],
   })
 
-  const shane = node({
-    title: 'Shane Turner',
-    name: 'SVP, AI Solutions',
-    variant: 'secondary',
-    photo: true,
-    width: 180,
-    children: functionalVps,
-  })
+  const travis = senior('Travis Hite', 'SVP, Engineering & Chief Platform Architect')
+  travis.children = functional
+  const roger = senior('Roger Kylin', 'VP, Systems Engineering Group')
+  roger.children = bde
 
   return {
     version: 1,
     meta: { title: 'SPG Organizational Structure', showTitle: true },
     roots: [
       node({
-        title: 'Sean Doherty',
+        title: 'Conn Doherty',
         name: 'President',
         variant: 'primary',
         photo: true,
         width: 210,
         children: [
-          node({ title: 'Nora Beth Ferris', name: 'Corporate Development', variant: 'secondary', photo: true, width: 180 }),
-          shane,
-          node({ title: 'Travis Hite', name: 'VP, Aerospace Portfolio', variant: 'secondary', photo: true, width: 180 }),
-          node({ title: 'Roger Kylin', name: 'VP, Engineering & Systems', variant: 'secondary', photo: true, width: 180 }),
+          senior('Sara Beth Perrin', 'Executive Assistant'),
+          senior('Shane Turner', 'SVP, AI Initiative'),
+          travis,
+          roger,
           advisorBoard,
-          node({ title: 'TBA', name: 'VP, International BD', variant: 'tertiary', width: 168 }),
         ],
       }),
     ],
