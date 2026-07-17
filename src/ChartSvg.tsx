@@ -81,9 +81,14 @@ function NodeBox({
   onSelect?: (id: string) => void
   onPointerDown?: (id: string, e: ReactPointerEvent) => void
 }) {
-  const v = p.node.color
-    ? { fill: p.node.color, text: readableText(p.node.color) }
-    : (variantFill[p.node.variant] ?? variantFill.secondary)
+  // Matrixed / dotted-line roles render as a white box with a dashed gray
+  // outline and dark text, instead of a filled variant color.
+  const dashed = !!p.node.dashed
+  const v = dashed
+    ? { fill: brand.white, text: brand.heading }
+    : p.node.color
+      ? { fill: p.node.color, text: readableText(p.node.color) }
+      : (variantFill[p.node.variant] ?? variantFill.secondary)
   const padX = M.padX
   const photo = p.node.photo
   const contentX = p.x + padX + (photo ? 38 : 0)
@@ -92,7 +97,7 @@ function NodeBox({
   let ty = p.y + M.padY + M.titleLineH - 5
   const contentH =
     p.titleLines.length * M.titleLineH +
-    (p.node.name ? M.nameLineH : 0) +
+    p.nameLines.length * M.nameLineH +
     (p.bulletLines.length ? 6 + p.bulletLines.length * M.bulletLineH : 0)
   // Vertically center content in the header.
   ty += Math.max(0, (p.headerH - M.padY * 2 - contentH) / 2)
@@ -127,11 +132,11 @@ function NodeBox({
       />,
     )
   }
-  if (p.node.name) {
+  p.nameLines.forEach((line, i) => {
     extras.push(
       <text
-        key="name"
-        x={p.leftAlign ? contentX + 8 : centerX}
+        key={`name${i}`}
+        x={p.leftAlign ? contentX + 8 + (i === 0 ? 0 : 8) : centerX}
         y={cursorY}
         fontSize={M.nameSize}
         fontStyle="italic"
@@ -139,11 +144,11 @@ function NodeBox({
         textAnchor={p.leftAlign ? 'start' : 'middle'}
         fontFamily={brand.fontFamily}
       >
-        {`• ${p.node.name}`}
+        {i === 0 ? `• ${line}` : line}
       </text>,
     )
     cursorY += M.nameLineH
-  }
+  })
   if (p.bulletLines.length) {
     cursorY += 6
     p.bulletLines.forEach((b, i) => {
@@ -220,6 +225,9 @@ function NodeBox({
         height={p.headerH}
         rx={M.boxRadius}
         fill={v.fill}
+        stroke={dashed ? brand.line : undefined}
+        strokeWidth={dashed ? 1.5 : undefined}
+        strokeDasharray={dashed ? '6 4' : undefined}
       />
       {p.detailBlocks.length > 0 && (
         // Square off the header's bottom corners when detail rows attach.

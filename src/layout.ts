@@ -40,6 +40,8 @@ export interface PlacedNode {
   /** Header + detail rows. */
   totalH: number
   titleLines: string[]
+  /** Wrapped person-name / role lines (italic, under the title). */
+  nameLines: string[]
   /** Left-align the title (boxes with names/bullets) vs centered. */
   leftAlign: boolean
   bulletLines: { text: string; first: boolean }[]
@@ -123,6 +125,7 @@ interface Measured {
   headerH: number
   totalH: number
   titleLines: string[]
+  nameLines: string[]
   leftAlign: boolean
   bulletLines: { text: string; first: boolean }[]
   detailBlocks: DetailBlock[]
@@ -143,6 +146,9 @@ function measureNode(node: OrgNode, vertical: boolean, g: LayoutGaps): Measured 
   const contentW = Math.max(40, w - M.padX * 2 - photoPad - (hasBadge ? 14 : 0))
 
   const titleLines = hidden ? [] : wrapText(node.title, M.titleSize, contentW, true)
+  // The name/role line is indented under the title bullet, so it wraps to a
+  // slightly narrower width.
+  const nameLines = hidden || !node.name ? [] : wrapText(node.name, M.nameSize, contentW - 8)
   const bulletLines: { text: string; first: boolean }[] = []
   for (const b of node.bullets ?? []) {
     const lines = wrapText(b, M.bulletSize, contentW - 12)
@@ -155,7 +161,7 @@ function measureNode(node: OrgNode, vertical: boolean, g: LayoutGaps): Measured 
     headerH =
       M.padY * 2 +
       titleLines.length * M.titleLineH +
-      (node.name ? M.nameLineH : 0) +
+      nameLines.length * M.nameLineH +
       (bulletLines.length ? 6 + bulletLines.length * M.bulletLineH : 0)
     headerH = Math.max(headerH, node.photo ? 52 : M.minHeaderH)
   }
@@ -200,6 +206,7 @@ function measureNode(node: OrgNode, vertical: boolean, g: LayoutGaps): Measured 
     headerH,
     totalH,
     titleLines,
+    nameLines,
     leftAlign,
     bulletLines,
     detailBlocks,
@@ -625,6 +632,7 @@ function layoutRadial(chart: OrgChart): Layout {
           headerH: n.m.headerH,
           totalH: n.m.totalH,
           titleLines: n.m.titleLines,
+          nameLines: n.m.nameLines,
           leftAlign: n.m.leftAlign,
           bulletLines: n.m.bulletLines,
           detailBlocks: n.m.detailBlocks,
@@ -708,6 +716,7 @@ function placeBox(n: OrgNode, m: Measured, x: number, y: number): PlacedNode {
     headerH: m.headerH,
     totalH: m.totalH,
     titleLines: m.titleLines,
+    nameLines: m.nameLines,
     leftAlign: m.leftAlign,
     bulletLines: m.bulletLines,
     detailBlocks: m.detailBlocks,
@@ -983,6 +992,7 @@ export function layoutChart(chart: OrgChart): Layout {
       headerH: m.headerH,
       totalH: m.totalH,
       titleLines: m.titleLines,
+      nameLines: m.nameLines,
       leftAlign: m.leftAlign,
       bulletLines: m.bulletLines,
       detailBlocks: m.detailBlocks,

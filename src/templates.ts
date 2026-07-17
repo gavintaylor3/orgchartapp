@@ -607,6 +607,372 @@ function mentorProtege(): OrgChart {
   }
 }
 
+/*
+ * Astrion "mission pillar" organizational structures.
+ *
+ * These are transcribed from Astrion's reference org charts: an Executive
+ * Leadership Team at the top, a Mission Solutions organization whose mission
+ * areas are the mission pillars, one detailed chart per pillar (Space
+ * Warfighting, Exploration & Lunar Presence, Life Cycle Management & Cyber,
+ * Integrated Air & Missile Defense, Layered Defense / Autonomous Warfare /
+ * Integrated Fires, Critical Infrastructure Protection), and the SPG
+ * organization.
+ *
+ * The source charts are plain white boxes; because this tool is brand-locked,
+ * the boxes are mapped onto Astrion semantic variants (pillar leader → Force
+ * primary, Solutions/Campaign leads → Sky secondary, portfolio boxes →
+ * Daylight tertiary). Each box shows the person's name as the title with their
+ * role in italics beneath, matching the reference layout. Names, titles and
+ * contract references were read from low-resolution images and are meant to be
+ * confirmed and edited per proposal.
+ */
+
+/** A name-over-role box (person name bold, role italic underneath). */
+function pillarBox(name: string, role?: string, extra: Partial<OrgNode> = {}): OrgNode {
+  return node({
+    title: name,
+    ...(role ? { name: role } : {}),
+    variant: 'tertiary',
+    width: 158,
+    ...extra,
+  })
+}
+
+/** A lead box in the Solutions Lead / Campaign Lead tier. Matrixed leads
+ *  (Campaign Lead, BDE, campaign/solution support) render dashed. */
+function leadBox(name: string, role: string, dashed = false): OrgNode {
+  return node({ title: name, name: role, variant: 'secondary', width: 180, ...(dashed ? { dashed: true } : {}) })
+}
+
+/** A pillar leader box (top of a mission-pillar chart). */
+function leaderBox(name: string, role: string, width = 250): OrgNode {
+  return node({ title: name, name: role, variant: 'primary', width })
+}
+
+/**
+ * Shared shape for the six mission-pillar charts: a pillar leader on top, a
+ * Solutions Lead / Campaign Lead tier beneath, and a row of portfolio boxes
+ * reporting under the Solutions Lead so the chart reads leader → leads →
+ * portfolios. Extra tail boxes (e.g. specialty executives) hang under the last
+ * portfolio.
+ */
+function pillarChart(opts: {
+  title: string
+  leader: OrgNode
+  leads: OrgNode[]
+  portfolios: OrgNode[]
+  tail?: OrgNode[]
+}): OrgChart {
+  const { title, leader, leads, portfolios, tail } = opts
+  if (tail && tail.length && portfolios.length) {
+    const last = portfolios[portfolios.length - 1]
+    last.children = [...(last.children ?? []), ...tail]
+  }
+  // Portfolios hang under the first lead (typically the Solutions Lead).
+  if (leads.length) {
+    leads[0].children = [...(leads[0].children ?? []), ...portfolios]
+  }
+  leader.children = leads
+  return {
+    version: 1,
+    meta: { title, showTitle: true },
+    roots: [leader],
+    groups: [],
+    comms: [],
+    legend: [],
+  }
+}
+
+/** Astrion 1 — Executive Leadership Team. */
+function executiveLeadership(): OrgChart {
+  const chief = (name: string, role: string): OrgNode =>
+    node({ title: name, name: role, variant: 'tertiary', photo: true, width: 168 })
+  return {
+    version: 1,
+    meta: { title: 'Executive Leadership Team', showTitle: true },
+    roots: [
+      node({
+        title: 'Tom Vice',
+        name: 'Chairman & CEO',
+        variant: 'primary',
+        photo: true,
+        width: 230,
+        children: [
+          node({ title: 'Tina Miller', name: 'Executive Assistant', variant: 'secondary', photo: true, width: 175 }),
+          node({ title: 'Eric Brown', name: 'President, Mission Solutions', variant: 'secondary', photo: true, width: 190 }),
+          node({ title: 'Conn Doherty', name: 'President, Strategy, Platform and Growth', variant: 'secondary', photo: true, width: 200 }),
+          chief('Julia Donley', 'Chief Contracts Officer'),
+          chief('Adam Omar', 'Chief Financial Officer'),
+          chief('Jennifer Damewood', 'Chief Business Operations Officer'),
+          chief('Adele Navarette', 'Chief Legal Officer'),
+          chief('Monique Sturdyvin', 'Chief People Officer'),
+        ],
+      }),
+    ],
+    groups: [],
+    comms: [],
+    legend: [],
+  }
+}
+
+/** Astrion 2 — Mission Solutions organization (the mission-pillar overview). */
+function missionSolutions(): OrgChart {
+  const lead = (name: string, role: string): OrgNode =>
+    pillarBox(name, role, { width: 178, photo: true })
+  // Mission Areas = the mission pillars (each heads a detailed pillar chart).
+  const missionAreas: OrgNode[] = [
+    lead('Iggy Alvarez', 'EVP, Lifecycle Management & Cyber Warfare'),
+    pillarBox('TBA', 'Integrated Air and Missile Defense', { width: 178 }),
+    lead('David Brost', 'EVP, Layered Defense, Autonomous Warfare, & Integrated Fires'),
+    lead('Scott Beidleman', 'EVP, Space Warfighting'),
+    lead('Lisa Watson-Morgan', 'EVP, Exploration and Lunar Presence'),
+    lead('Jeff Wehner', 'EVP, Critical Infrastructure Protection'),
+  ]
+  const support: OrgNode[] = [
+    lead('Rob Dumont', 'SVP, Campaigns Lead'),
+    lead('Nicole Jacobsen', 'VP, Human Resources'),
+    lead('Chad Looser', 'VP, Finance'),
+    lead('Mary Lee Pence', 'VP, Contracts'),
+  ]
+  const subsidiary = pillarBox('Jay Kovacs', 'President, Axient Systems, BV', { width: 178, photo: true })
+
+  return {
+    version: 1,
+    meta: { title: 'Mission Solutions Organizational Structure', showTitle: true },
+    roots: [
+      node({
+        title: 'Eric Brown',
+        name: 'President',
+        variant: 'primary',
+        photo: true,
+        width: 220,
+        children: [...missionAreas, ...support, subsidiary],
+      }),
+    ],
+    groups: [
+      { id: uid('g'), label: 'Mission Areas', style: 'green', memberIds: missionAreas.map((n) => n.id) },
+      { id: uid('g'), label: 'Campaign & Functional Support', style: 'blue', memberIds: support.map((n) => n.id) },
+    ],
+    comms: [],
+    legend: [
+      { id: uid('l'), marker: 'green', label: 'Mission Areas (mission pillars)' },
+      { id: uid('l'), marker: 'blue', label: 'Campaign & Functional Support' },
+    ],
+  }
+}
+
+/** Astrion 3 — Space Warfighting. */
+function spaceWarfighting(): OrgChart {
+  const port = (name: string, role: string, refs: string[], width = 168): OrgNode =>
+    pillarBox(name, role, { width, bullets: refs })
+  return pillarChart({
+    title: 'Space Warfighting Organizational Structure',
+    leader: leaderBox('Scott Beidleman', 'EVP, Space Warfighting'),
+    leads: [leadBox('Kent Nickle', 'Solutions Lead'), leadBox('Logan Palmer', 'Campaign Lead / BDE', true)],
+    portfolios: [
+      port('Jim Tobin', 'Allied Space Missions', ['KSA FMS']),
+      port('Julie Nguyen', 'Space Sensing', ['DC STS-3', '(SN SETA)']),
+      port('Max Mai', 'Space Integration & Futures', ['ZA STS-3', 'S9 OTA', 'RISE']),
+      port('Mike Plantenga', 'Global Mission Operations', [
+        'SBI OTA', 'SBST OTA', 'Eclipse', 'MilCompPNT', 'MSEIT', 'Hemisphere', 'TETRA', 'DIA SIA 3',
+      ]),
+      port('Jesse Blash', 'Space Access', ['NEC', 'LE SE&I II', 'RSLP']),
+      port('Kyle Morris', 'Space Control', [
+        'RRB Support', 'JSOAC Tos', 'COMPASS', 'ESL/BOAOPIR', 'Black Bear', 'Grizzly Bear', 'RODIO', 'Thunderdome',
+      ]),
+      port('Tom Shearer', 'Space Energy & Wargaming', ['RETS', 'SAF/IEN', 'SAF SP']),
+    ],
+  })
+}
+
+/** Astrion 4 — Exploration & Lunar Presence. */
+function explorationLunar(): OrgChart {
+  const port = (name: string, role: string, refs: string[], width = 168): OrgNode =>
+    pillarBox(name, role, { width, bullets: refs })
+  // Two specialty portfolios each carry a subordinate executive box.
+  const davidWalker = port('David Walker', 'Specialty Engineering Systems', ['ESSCA 330K', 'USA'], 176)
+  davidWalker.children = [pillarBox('Paul Hastings', 'Technical Specialty Executive', { width: 176 })]
+  const jonSharpe = port('Jon Sharpe', 'Civil Space Engineering', [
+    'METTS III', 'ESSCA I', 'CPSS PP&C', 'MOSSI', 'SLS/Boeing', 'RSES LaRC', 'SMAEC',
+  ], 176)
+  jonSharpe.children = [pillarBox('Terry Quick', 'JSC Teammate Principal (SMAEC)', { width: 176 })]
+
+  return pillarChart({
+    title: 'Exploration & Lunar Presence Organizational Structure',
+    leader: leaderBox('Lisa Watson-Morgan', 'EVP, Exploration & Lunar Presence', 260),
+    leads: [leadBox('Gerrit Burke', 'Solutions Lead'), leadBox('Genevieve Burkett', 'Campaign Lead / BDE', true)],
+    portfolios: [
+      port('Dustin Lore', 'Comet', ['COMET']),
+      port('Sofia Harvie', 'JSC Engineering JETS', ['JETS2', 'REMIS 2']),
+      port('Todd Shull', 'Product Development Center Systems', ['PSSC', 'PDC', 'SHARP'], 176),
+      port('Matt Nugent', 'LASSO', ['LASSO']),
+      port('James Chartres / Andrea Nazzal', 'Research & Development Engineering', [
+        'ARC', 'PESS II', 'ASSESS', 'ISDRS', 'LTA',
+      ], 188),
+      davidWalker,
+      jonSharpe,
+    ],
+  })
+}
+
+/** Astrion 5 — Life Cycle Management & Cyber. */
+function lifeCycleCyber(): OrgChart {
+  const port = (name: string, role: string, refs: string[], width = 172): OrgNode =>
+    pillarBox(name, role, { width, bullets: refs })
+  return pillarChart({
+    title: 'Life Cycle Management & Cyber Organizational Structure',
+    leader: leaderBox('Ignacio Alvarez', 'EVP, Life Cycle Management & Cyber', 270),
+    leads: [
+      leadBox('Brett Matzenbacher', 'Solutions Lead'),
+      leadBox('Jason Galindo', 'Campaign Lead', true),
+      leadBox('David Sloat', 'Campaign / Solution Support', true),
+      leadBox('James Dennis', 'BDE', true),
+    ],
+    portfolios: [
+      port('Rich Ruiz', 'Cyber', ['EPASS HN', 'ACC A6 UCS', 'A2/A6 UCS']),
+      port('Jake Bontatibus / Lindsey Dashiell', 'EPASS PMO', [
+        'EPASS GB', 'EPASS HB', 'EPASS 74', 'EPASS 75', 'EPASS 79', 'SAOC', 'ISR/SOF',
+      ], 188),
+      port('Mike Leaver', 'Training & Development Support', ['JINTACCS', 'F-15', 'CyOFTS (pending)']),
+      port('Mike Lindhorst / Tom Kaminske', 'Test & Evaluation', [
+        'CTG', 'TENANTS', '96TW', 'SEMATS', 'AVAL II', 'RAPTR', 'T&E PST3',
+      ], 188),
+      port('TBD', 'Program & Weapon Systems', [
+        'RTES', 'HWIL', 'DEVCOM Programmatic', 'B&A CCDC AvMC', 'AvMC SSLE', 'PM Storm',
+      ]),
+      port('Michael Gibson', 'Mission Systems Lifecycle', [
+        'Air Warrior RIMFIRE', 'TCSI Fixed Wing', 'ASE', 'UHPO', 'Fort Moore Aviation', 'STRIKE',
+      ]),
+    ],
+  })
+}
+
+/** Astrion 6 — Integrated Air & Missile Defense. */
+function integratedAirMissile(): OrgChart {
+  const port = (name: string, role: string, refs: string[], width = 176): OrgNode =>
+    pillarBox(name, role, { width, bullets: refs })
+  return pillarChart({
+    title: 'Integrated Air & Missile Defense Organizational Structure',
+    leader: leaderBox('Eric Brown', 'President, Mission Solutions — IAMD Mission Lead (Acting)', 300),
+    leads: [leadBox('TBD', 'Solutions Lead'), leadBox('TBD', 'Campaign Lead', true)],
+    portfolios: [
+      port('Shane Gwaltney', 'Missile Defense Services', [
+        'MDA TN-Test', 'MDA TN-MDSE', 'MDA Aegis', 'MDA EBB', 'MDA SHIELD',
+      ]),
+      port('Dusty Gray', 'NAVSEA Portfolio', [
+        'Adv Radars Team', 'PEO IWS Cyber', 'NSWCDD Team', 'NSWC Corona', 'USFFC FTDPS',
+        'PEO IWS 3 Reddog TO', 'PEO IWS 3 ECS',
+      ]),
+      port('Ian Livingston', 'SB Weapons Portfolio', ['SG040']),
+      port('Marta Savage', 'ONI Portfolio', ['SG030']),
+      port('Brent Mager', 'MDA Threat Portfolio', [
+        'SG017 – MDA TSE-SP', 'Z0025 – MDA TSE-TP', 'Z0044 – MDA MSV-TASD',
+      ]),
+    ],
+  })
+}
+
+/** Astrion 7 — Layered Defense, Autonomous Warfare, & Integrated Fires. */
+function layeredDefense(): OrgChart {
+  return pillarChart({
+    title: 'Layered Defense, Autonomous Warfare, & Integrated Fires Organizational Structure',
+    leader: leaderBox('Dave Brost', 'EVP, Layered Defense, Autonomous Warfare, & Integrated Fires', 320),
+    leads: [leadBox('Shane Turner', 'Solutions Lead / AI'), leadBox('Rob DuMont', 'Mission Campaigns', true)],
+    portfolios: [
+      pillarBox('TBD', 'Layered Defense & Counter-UAS', { width: 180, bullets: ['IF/RCO'] }),
+      pillarBox('Jake Wade', 'Autonomous Systems', { width: 180, bullets: ['MUSV Family of Systems'] }),
+      pillarBox('Brad Pasho', 'Integrated Fires', { width: 180 }),
+    ],
+  })
+}
+
+/** Astrion 8 — Critical Infrastructure Protection. */
+function criticalInfrastructure(): OrgChart {
+  return pillarChart({
+    title: 'Critical Infrastructure Protection Organizational Structure',
+    leader: leaderBox('Jeff Wehner', 'EVP, Critical Infrastructure Protection', 290),
+    leads: [leadBox('TBD', 'Solutions Lead'), leadBox('TBD', 'Campaign Lead', true)],
+    portfolios: [
+      pillarBox('Anetra Withers', 'Transportation', {
+        width: 185,
+        bullets: ['FAA PSS', 'JMA TSSI', 'SETIS IDIQ', 'Leidos NISC IV'],
+      }),
+      pillarBox('Tom Evans (A)', 'Energy', {
+        width: 185,
+        bullets: ['NRC CPSS', 'NRC CSRPDSS', 'DHS OIG SCAS'],
+      }),
+      pillarBox('TBD', 'Defense Industrial Base', { width: 185 }),
+    ],
+  })
+}
+
+/** Astrion 9 — SPG organization. */
+function spg(): OrgChart {
+  const senior = (name: string, role: string): OrgNode =>
+    node({ title: name, name: role, variant: 'secondary', photo: true, width: 188 })
+  const vp = (name: string, role: string): OrgNode =>
+    pillarBox(name, role, { width: 170, photo: true })
+
+  // All campaign / BDE leads roll up under the Campaigns Lead (Rob Dumont).
+  const campaigns: OrgNode[] = [
+    vp('Scott King', 'VP, Army BDE'),
+    vp('Bobby Brown', 'VP, Navy/MDA BDE'),
+    vp('James Dennis', 'VP, USAF BDE'),
+    vp('Logan Palmer', 'VP, NSS BDE / Campaign Lead'),
+    vp('Genevieve Burkett', 'VP, E&LP BDE / Campaign Lead'),
+    node({ title: 'TBD', name: 'VP, FedCiv BDE / Campaign Lead', variant: 'tertiary', width: 170 }),
+    node({ title: 'TBA', name: 'VP, International BDE', variant: 'tertiary', width: 170 }),
+  ]
+  const robDumont = senior('Rob Dumont', 'SVP, Campaigns Lead')
+  robDumont.children = campaigns
+
+  const advisorBoard = node({
+    title: 'Industry Advisor Board',
+    variant: 'secondary',
+    width: 200,
+    childLayout: 'stack',
+    children: [
+      pillarBox('TBA', undefined, { width: 130 }),
+      pillarBox('TBA', undefined, { width: 130 }),
+      pillarBox('TBA', undefined, { width: 130 }),
+      pillarBox('TBA', undefined, { width: 130 }),
+      pillarBox('TBA', undefined, { width: 130 }),
+    ],
+  })
+
+  // Functional VPs report directly to the President; all campaigns roll up
+  // under Rob Dumont (Campaigns Lead).
+  return {
+    version: 1,
+    meta: { title: 'SPG Organizational Structure', showTitle: true },
+    roots: [
+      node({
+        title: 'Conn Doherty',
+        name: 'President',
+        variant: 'primary',
+        photo: true,
+        width: 210,
+        children: [
+          senior('Sara Beth Perrin', 'Executive Assistant'),
+          senior('Shane Turner', 'SVP, AI Initiative'),
+          senior('Travis Hite', 'SVP, Engineering & Chief Platform Architect'),
+          senior('Roger Kylin', 'VP, Systems Engineering Group'),
+          robDumont,
+          vp('Jason Galindo', 'VP, LCMWC Campaign Lead'),
+          vp('Peter Weilbach', 'VP, Capture'),
+          vp('Helene Courard', 'VP, Proposals'),
+          vp('Christine Fuentes', 'VP, Marketing and Communications'),
+          vp('Kristin Estok', 'VP, Business Operations'),
+          advisorBoard,
+        ],
+      }),
+    ],
+    groups: [],
+    comms: [],
+    legend: [],
+  }
+}
+
 export const templates: { key: string; label: string; build: () => OrgChart }[] = [
   { key: 'simple-hierarchy', label: 'Simple Hierarchy (clean top-down)', build: simpleHierarchy },
   { key: 'functional-divisions', label: 'Functional Divisions (department stacks)', build: functionalDivisions },
@@ -615,6 +981,15 @@ export const templates: { key: string; label: string; build: () => OrgChart }[] 
   { key: 'joint-venture', label: 'Joint Venture (board, PMO & TMs)', build: jointVenture },
   { key: 'mentor-protege', label: 'Mentor-Protégé JV (multi-site)', build: mentorProtege },
   { key: 'pmo-comms', label: 'PMO (lines of communication)', build: pmoComms },
+  { key: 'exec-leadership', label: 'Astrion — Executive Leadership Team', build: executiveLeadership },
+  { key: 'mission-solutions', label: 'Astrion — Mission Solutions (mission pillars)', build: missionSolutions },
+  { key: 'space-warfighting', label: 'Astrion — Space Warfighting', build: spaceWarfighting },
+  { key: 'exploration-lunar', label: 'Astrion — Exploration & Lunar Presence', build: explorationLunar },
+  { key: 'lifecycle-cyber', label: 'Astrion — Life Cycle Management & Cyber', build: lifeCycleCyber },
+  { key: 'iamd', label: 'Astrion — Integrated Air & Missile Defense', build: integratedAirMissile },
+  { key: 'layered-defense', label: 'Astrion — Layered Defense, Autonomous Warfare & Integrated Fires', build: layeredDefense },
+  { key: 'critical-infrastructure', label: 'Astrion — Critical Infrastructure Protection', build: criticalInfrastructure },
+  { key: 'spg', label: 'Astrion — SPG Organization', build: spg },
 ]
 
 /** The chart shown on first load (before any localStorage autosave exists). */

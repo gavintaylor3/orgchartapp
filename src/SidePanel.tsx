@@ -250,6 +250,10 @@ function NodeEditor({ chart, onChange, selectedId, onSelect }: Props) {
           <input type="checkbox" checked={!!node.photo} onChange={(e) => patch({ photo: e.target.checked || undefined })} />
           Photo placeholder
         </label>
+        <label className="check">
+          <input type="checkbox" checked={!!node.dashed} onChange={(e) => patch({ dashed: e.target.checked || undefined })} />
+          Dashed outline (matrixed role)
+        </label>
       </div>
 
       {node.pos && (

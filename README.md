@@ -36,6 +36,18 @@ Your working chart autosaves to localStorage.
      column, a program-leadership chain, delivery-staff functional leads, and corporate resources.
    - **PMO** — corporate and customer columns with two-way communication-channel arrows
      and a dashed PMO container.
+   - **Astrion mission-pillar structures** — a set of Astrion organizational charts:
+     Executive Leadership Team; Mission Solutions (the mission-pillar overview, with a
+     tinted "Mission Areas" zone and a "Campaign & Functional Support" zone); and one
+     chart per mission pillar — Space Warfighting, Exploration & Lunar Presence,
+     Life Cycle Management & Cyber, Integrated Air & Missile Defense, Layered Defense /
+     Autonomous Warfare / Integrated Fires, and Critical Infrastructure Protection —
+     plus the SPG organization. Each pillar chart follows a leader → Solutions Lead /
+     Campaign Lead → portfolio-row pattern, with contract-vehicle references listed as
+     bullets and matrixed roles (Campaign Lead / BDE / support) shown as dashed boxes.
+     Because the tool is brand-locked, the source white boxes
+     are mapped onto Astrion variants (leader → Force, leads → Sky, portfolios →
+     Daylight). Names and titles are starting points — edit them per proposal.
 2. **Click any box** (in the chart or the tree) to edit its title, person name,
    style, bullets, detail rows, badges, photo placeholder, and width.
    Add children/siblings, reorder, or delete from the same panel.
@@ -91,6 +103,7 @@ use Supernova (gold) and Silver (gray).
       "name": "Jane Smith",            // italic person name
       "photo": true,                    // photo placeholder
       "variant": "primary",            // primary | secondary | tertiary | accent | hidden
+      "dashed": false,                  // true = matrixed role (white box, dashed gray outline)
       "badges": ["keyGold"],           // keyGold | keyGray | cornerAccent
       "details": [                      // white rows attached under the box
         { "label": "PWS:", "text": "2.1" },
@@ -117,6 +130,9 @@ Tips:
 - `variant: "hidden"` makes an invisible container — use it with
   `childLayout: "stack"` to build free-standing columns (corporate resources,
   customer stakeholders) like the PMO template.
+- `dashed: true` renders a box as a matrixed / dotted-line role: a white box
+  with a dashed gray outline instead of a filled variant color (used for the
+  Campaign Lead / BDE / support roles in the Astrion mission-pillar charts).
 - Widths default to the theme metric; set `width` per node when a box needs to
   carry more text.
 
