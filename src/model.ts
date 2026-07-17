@@ -44,6 +44,9 @@ export interface OrgNode {
   color?: string
   /** Optional width override in px (default from theme metrics). */
   width?: number
+  /** Render as a matrixed / dotted-line role: a white box with a dashed gray
+   *  outline instead of a filled variant color. */
+  dashed?: boolean
   /** Manual position override (top-left, in the layout's screen coordinates).
    *  Set by dragging the box on the canvas; clearing it restores auto-layout. */
   pos?: { x: number; y: number }

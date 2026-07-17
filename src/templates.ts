@@ -638,14 +638,15 @@ function pillarBox(name: string, role?: string, extra: Partial<OrgNode> = {}): O
   })
 }
 
-/** A lead box in the Solutions Lead / Campaign Lead tier. */
-function leadBox(name: string, role: string): OrgNode {
-  return node({ title: name, name: role, variant: 'secondary', width: 180 })
+/** A lead box in the Solutions Lead / Campaign Lead tier. Matrixed leads
+ *  (Campaign Lead, BDE, campaign/solution support) render dashed. */
+function leadBox(name: string, role: string, dashed = false): OrgNode {
+  return node({ title: name, name: role, variant: 'secondary', width: 180, ...(dashed ? { dashed: true } : {}) })
 }
 
 /** A pillar leader box (top of a mission-pillar chart). */
 function leaderBox(name: string, role: string, width = 250): OrgNode {
-  return node({ title: name, name: role, variant: 'primary', photo: true, width })
+  return node({ title: name, name: role, variant: 'primary', width })
 }
 
 /**
@@ -697,14 +698,14 @@ function executiveLeadership(): OrgChart {
         photo: true,
         width: 230,
         children: [
-          node({ title: 'Tina Miller', name: 'Chief of Staff', variant: 'secondary', photo: true, width: 175 }),
+          node({ title: 'Tina Miller', name: 'Executive Assistant', variant: 'secondary', photo: true, width: 175 }),
           node({ title: 'Pete Nguyen', name: 'President, Mission Solutions', variant: 'secondary', photo: true, width: 190 }),
           node({ title: 'Lynn Doherty', name: 'President', variant: 'secondary', photo: true, width: 175 }),
-          chief('Julie Donley', 'Chief Contracts Officer'),
-          chief('Adam Dunn', 'Chief Financial Officer'),
-          chief('Jennifer Dunnwood', 'Chief Operations Officer'),
-          chief('Adele Navarrete', 'Chief Legal Officer'),
-          chief('Monique Stardyne', 'Chief People Officer'),
+          chief('Julia Donley', 'Chief Contracts Officer'),
+          chief('Adam Omar', 'Chief Financial Officer'),
+          chief('Jennifer Damewood', 'Chief Business Operations Officer'),
+          chief('Adele Navarette', 'Chief Legal Officer'),
+          chief('Monique Sturdyvin', 'Chief People Officer'),
         ],
       }),
     ],
@@ -716,29 +717,31 @@ function executiveLeadership(): OrgChart {
 
 /** Astrion 2 — Mission Solutions organization (the mission-pillar overview). */
 function missionSolutions(): OrgChart {
-  // Mission Areas = the six mission-pillar leads (each heads a pillar chart).
+  const lead = (name: string, role: string): OrgNode =>
+    pillarBox(name, role, { width: 178, photo: true })
+  // Mission Areas = the mission pillars (each heads a detailed pillar chart).
   const missionAreas: OrgNode[] = [
-    pillarBox('Iggy Alvarez', 'Life Cycle Management & Cyber', { width: 172 }),
-    pillarBox('Scott Anderson', 'Space Warfighting', { width: 172 }),
-    pillarBox('Lisa Watson-Morgan', 'Exploration & Lunar Presence', { width: 172 }),
-    pillarBox('Dave Brost', 'Layered Defense, Autonomous Warfare & Integrated Fires', { width: 172 }),
-    pillarBox('Jeff Wehner', 'Critical Infrastructure Protection', { width: 172 }),
-    pillarBox('Eric Brown', 'Integrated Air & Missile Defense', { width: 172 }),
+    lead('Iggy Alvarez', 'EVP, Lifecycle Management & Cyber Warfare'),
+    pillarBox('TBA', 'Integrated Air and Missile Defense', { width: 178 }),
+    lead('David Brost', 'EVP, Layered Defense, Autonomous Warfare, & Integrated Fires'),
+    lead('Scott Beidleman', 'EVP, Space Warfighting'),
+    lead('Lisa Watson-Morgan', 'EVP, Exploration and Lunar Presence'),
+    lead('Jeff Wehner', 'EVP, Critical Infrastructure Protection'),
   ]
   const support: OrgNode[] = [
-    pillarBox('Rob Dumont', 'SVP, Campaigns', { width: 168 }),
-    pillarBox('Wade Sanderson', 'VP', { width: 168 }),
-    pillarBox('Chad Loomer', 'VP', { width: 168 }),
-    pillarBox('Mary Lou Ponce', 'VP, Contracts', { width: 168 }),
+    lead('Rob Dumont', 'SVP, Campaigns Lead'),
+    lead('Nicole Jacobsen', 'VP, Human Resources'),
+    lead('Chad Looser', 'VP, Finance'),
+    lead('Mary Lee Pence', 'VP, Contracts'),
   ]
-  const subsidiary = pillarBox('Jay Kovacs', 'President, Subsidiary', { width: 172 })
+  const subsidiary = pillarBox('Jay Kovacs', 'President, Axient Systems, BV', { width: 178, photo: true })
 
   return {
     version: 1,
     meta: { title: 'Mission Solutions Organizational Structure', showTitle: true },
     roots: [
       node({
-        title: 'Erik Simon',
+        title: 'Eric Brown',
         name: 'President',
         variant: 'primary',
         photo: true,
@@ -760,18 +763,24 @@ function missionSolutions(): OrgChart {
 
 /** Astrion 3 — Space Warfighting. */
 function spaceWarfighting(): OrgChart {
+  const port = (name: string, role: string, refs: string[], width = 168): OrgNode =>
+    pillarBox(name, role, { width, bullets: refs })
   return pillarChart({
     title: 'Space Warfighting Organizational Structure',
-    leader: leaderBox('Scott Anderson', 'SVP, Space Warfighting'),
-    leads: [leadBox('Brad Meikle', 'Solutions Lead'), leadBox('Logan Palmer', 'Campaign Lead')],
+    leader: leaderBox('Scott Beidleman', 'EVP, Space Warfighting'),
+    leads: [leadBox('Kent Nickle', 'Solutions Lead'), leadBox('Logan Palmer', 'Campaign Lead / BDE', true)],
     portfolios: [
-      pillarBox('Dan Tucker', 'Missile & Space Warning'),
-      pillarBox('John Nguyen', 'Space Sensing'),
-      pillarBox('Max Mar', 'Command & Control'),
-      pillarBox('Mike Plentynge', 'C4ISR'),
-      pillarBox('Jason Nash', 'Space Access'),
-      pillarBox('Kyle Morris', 'Space Domain Awareness'),
-      pillarBox('Tom Shearer', 'Space Energy & Propulsion'),
+      port('Jim Tobin', 'Allied Space Missions', ['KSA FMS']),
+      port('Julie Nguyen', 'Space Sensing', ['DC STS-3', '(SN SETA)']),
+      port('Max Mai', 'Space Integration & Futures', ['ZA STS-3', 'S9 OTA', 'RISE']),
+      port('Mike Plantenga', 'Global Mission Operations', [
+        'SBI OTA', 'SBST OTA', 'Eclipse', 'MilCompPNT', 'MSEIT', 'Hemisphere', 'TETRA', 'DIA SIA 3',
+      ]),
+      port('Jesse Blash', 'Space Access', ['NEC', 'LE SE&I II', 'RSLP']),
+      port('Kyle Morris', 'Space Control', [
+        'RRB Support', 'JSOAC Tos', 'COMPASS', 'ESL/BOAOPIR', 'Black Bear', 'Grizzly Bear', 'RODIO', 'Thunderdome',
+      ]),
+      port('Tom Shearer', 'Space Energy & Wargaming', ['RETS', 'SAF/IEN', 'SAF SP']),
     ],
   })
 }
@@ -800,38 +809,57 @@ function explorationLunar(): OrgChart {
 
 /** Astrion 5 — Life Cycle Management & Cyber. */
 function lifeCycleCyber(): OrgChart {
+  const port = (name: string, role: string, refs: string[], width = 172): OrgNode =>
+    pillarBox(name, role, { width, bullets: refs })
   return pillarChart({
     title: 'Life Cycle Management & Cyber Organizational Structure',
-    leader: leaderBox('Ignacio Alvarez', 'SVP, Life Cycle Management & Cyber', 270),
+    leader: leaderBox('Ignacio Alvarez', 'EVP, Life Cycle Management & Cyber', 270),
     leads: [
       leadBox('Brett Matzenbacher', 'Solutions Lead'),
-      leadBox('Jason Galindo', 'Campaign Lead'),
-      leadBox('David Sisak', 'Campaign'),
-      leadBox('James Dennis', 'Business Development'),
+      leadBox('Jason Galindo', 'Campaign Lead', true),
+      leadBox('David Sloat', 'Campaign / Solution Support', true),
+      leadBox('James Dennis', 'BDE', true),
     ],
     portfolios: [
-      pillarBox('Rich Ruiz', 'Cyber'),
-      pillarBox('Jake Bontatibus / Lindsey Dunkleff', 'Portfolio', { width: 178 }),
-      pillarBox('Mike Leaner', 'Training & Sustainment'),
-      pillarBox('Mike Lindfoot / Tom Kervinke', 'Test & Evaluation', { width: 178 }),
-      pillarBox('TBD', 'Programs & Engineering'),
-      pillarBox('Michael Gibson', 'Product Realization Lifecycle', { width: 172 }),
+      port('Rich Ruiz', 'Cyber', ['EPASS HN', 'ACC A6 UCS', 'A2/A6 UCS']),
+      port('Jake Bontatibus / Lindsey Dashiell', 'EPASS PMO', [
+        'EPASS GB', 'EPASS HB', 'EPASS 74', 'EPASS 75', 'EPASS 79', 'SAOC', 'ISR/SOF',
+      ], 188),
+      port('Mike Leaver', 'Training & Development Support', ['JINTACCS', 'F-15', 'CyOFTS (pending)']),
+      port('Mike Lindhorst / Tom Kaminske', 'Test & Evaluation', [
+        'CTG', 'TENANTS', '96TW', 'SEMATS', 'AVAL II', 'RAPTR', 'T&E PST3',
+      ], 188),
+      port('TBD', 'Program & Weapon Systems', [
+        'RTES', 'HWIL', 'DEVCOM Programmatic', 'B&A CCDC AvMC', 'AvMC SSLE', 'PM Storm',
+      ]),
+      port('Michael Gibson', 'Mission Systems Lifecycle', [
+        'Air Warrior RIMFIRE', 'TCSI Fixed Wing', 'ASE', 'UHPO', 'Fort Moore Aviation', 'STRIKE',
+      ]),
     ],
   })
 }
 
 /** Astrion 6 — Integrated Air & Missile Defense. */
 function integratedAirMissile(): OrgChart {
+  const port = (name: string, role: string, refs: string[], width = 176): OrgNode =>
+    pillarBox(name, role, { width, bullets: refs })
   return pillarChart({
     title: 'Integrated Air & Missile Defense Organizational Structure',
     leader: leaderBox('Eric Brown', 'President, Mission Solutions — IAMD Mission Lead (Acting)', 300),
-    leads: [leadBox('TBD', 'Solutions Lead'), leadBox('TBD', 'Campaign Lead')],
+    leads: [leadBox('TBD', 'Solutions Lead'), leadBox('TBD', 'Campaign Lead', true)],
     portfolios: [
-      pillarBox('Shane Boadhray', 'Missile Defense Portfolio', { width: 168 }),
-      pillarBox('Dusty Gray', 'BMDS Portfolio', { width: 168 }),
-      pillarBox('Dan Livingston', 'Air Weapons Portfolio', { width: 168 }),
-      pillarBox('Marla Savage', 'C4I Portfolio', { width: 168 }),
-      pillarBox('Brent Mayer', 'MDA Threat Portfolio', { width: 168 }),
+      port('Shane Gwaltney', 'Missile Defense Services', [
+        'MDA TN-Test', 'MDA TN-MDSE', 'MDA Aegis', 'MDA EBB', 'MDA SHIELD',
+      ]),
+      port('Dusty Gray', 'NAVSEA Portfolio', [
+        'Adv Radars Team', 'PEO IWS Cyber', 'NSWCDD Team', 'NSWC Corona', 'USFFC FTDPS',
+        'PEO IWS 3 Reddog TO', 'PEO IWS 3 ECS',
+      ]),
+      port('Ian Livingston', 'SB Weapons Portfolio', ['SG040']),
+      port('Marta Savage', 'ONI Portfolio', ['SG030']),
+      port('Brent Mager', 'MDA Threat Portfolio', [
+        'SG017 – MDA TSE-SP', 'Z0025 – MDA TSE-TP', 'Z0044 – MDA MSV-TASD',
+      ]),
     ],
   })
 }
@@ -841,10 +869,10 @@ function layeredDefense(): OrgChart {
   return pillarChart({
     title: 'Layered Defense, Autonomous Warfare, & Integrated Fires Organizational Structure',
     leader: leaderBox('Dave Brost', 'EVP, Layered Defense, Autonomous Warfare, & Integrated Fires', 320),
-    leads: [leadBox('Shane Turner', 'Solutions Lead / AI'), leadBox('Rob DuMont', 'Mission Campaigns')],
+    leads: [leadBox('Shane Turner', 'Solutions Lead / AI'), leadBox('Rob DuMont', 'Mission Campaigns', true)],
     portfolios: [
-      pillarBox('TBD', 'Layered Defense & Counter-UAS', { width: 180, bullets: ['JF / RCO'] }),
-      pillarBox('Jake Wade', 'Autonomous Systems', { width: 180, bullets: ['MoSA Family of Systems'] }),
+      pillarBox('TBD', 'Layered Defense & Counter-UAS', { width: 180, bullets: ['IF/RCO'] }),
+      pillarBox('Jake Wade', 'Autonomous Systems', { width: 180, bullets: ['MUSV Family of Systems'] }),
       pillarBox('Brad Pasho', 'Integrated Fires', { width: 180 }),
     ],
   })
