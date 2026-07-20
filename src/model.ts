@@ -42,8 +42,13 @@ export interface OrgNode {
   /** Optional fill override (hex). Wins over the variant color; text color is
    *  picked automatically for contrast. Clear it to fall back to the variant. */
   color?: string
-  /** Optional width override in px (default from theme metrics). */
+  /** Optional width override in px (default from theme metrics). Set by
+   *  dragging the box's edge handle on the canvas, or from the inspector. */
   width?: number
+  /** Optional box-height override in px. Grows the colored box (never shrinks it
+   *  below the height its own text needs, so a proposal box can't clip a name).
+   *  Set by dragging the box's bottom handle, or from the inspector. */
+  height?: number
   /** Render as a matrixed / dotted-line role: a white box with a dashed gray
    *  outline instead of a filled variant color. */
   dashed?: boolean
@@ -159,6 +164,11 @@ export function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T
 }
 
+/** Smallest a box may be dragged to. Width has a hard floor; height is a floor
+ *  on the override — the layout still grows a box past this to fit its text. */
+export const MIN_BOX_WIDTH = 80
+export const MIN_BOX_HEIGHT = 28
+
 /** Depth-first visit over every node in the chart. */
 export function visit(
   roots: OrgNode[],
@@ -202,6 +212,19 @@ export function sanitizePositions(chart: OrgChart): OrgChart {
   visit(chart.roots, (n) => {
     const p = n.pos
     if (p && !(Number.isFinite(p.x) && Number.isFinite(p.y))) delete n.pos
+  })
+  return chart
+}
+
+/**
+ * Drop any malformed size override (missing, non-finite, or non-positive) from
+ * an untrusted chart, so the layout engine never receives garbage geometry from
+ * a hand-edited JSON tab or an imported file. Mutates and returns the chart.
+ */
+export function sanitizeSizes(chart: OrgChart): OrgChart {
+  visit(chart.roots, (n) => {
+    if (n.width !== undefined && !(Number.isFinite(n.width) && n.width > 0)) delete n.width
+    if (n.height !== undefined && !(Number.isFinite(n.height) && n.height > 0)) delete n.height
   })
   return chart
 }
@@ -308,6 +331,31 @@ export function setNodePos(
   return next
 }
 
+/**
+ * Set or clear a node's manual size overrides. Each dimension is independent:
+ * pass a number to set it (clamped to the minimum), `null` to clear it back to
+ * auto, or omit it to leave that dimension untouched.
+ */
+export function setNodeSize(
+  chart: OrgChart,
+  id: string,
+  size: { width?: number | null; height?: number | null },
+): OrgChart {
+  const next = clone(chart)
+  const n = findNode(next, id)
+  if (n) {
+    if (size.width !== undefined) {
+      if (size.width === null) delete n.width
+      else n.width = Math.max(MIN_BOX_WIDTH, Math.round(size.width))
+    }
+    if (size.height !== undefined) {
+      if (size.height === null) delete n.height
+      else n.height = Math.max(MIN_BOX_HEIGHT, Math.round(size.height))
+    }
+  }
+  return next
+}
+
 export function moveNode(chart: OrgChart, id: string, dir: -1 | 1): OrgChart {
   const next = clone(chart)
   const loc = findContainer(next, id)
@@ -374,5 +422,5 @@ export function normalizeChart(input: unknown): OrgChart {
     comms: Array.isArray(c.comms) ? c.comms.map(normalizeEdge) : [],
     legend: Array.isArray(c.legend) ? c.legend : [],
   }
-  return sanitizePositions(sanitizeColors(chart))
+  return sanitizeSizes(sanitizePositions(sanitizeColors(chart)))
 }

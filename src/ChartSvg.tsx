@@ -18,9 +18,15 @@ interface Props {
   onSelect?: (id: string) => void
   /** Begin a drag-to-reposition gesture on a box. */
   onNodePointerDown?: (id: string, e: ReactPointerEvent) => void
+  /** Begin a drag-to-resize gesture from one of the selected box's handles. */
+  onResizeStart?: (id: string, handle: ResizeHandle, e: ReactPointerEvent) => void
   /** Accessible summary of the chart, announced to screen readers. */
   ariaLabel?: string
 }
+
+/** Which handle a resize drag started from: east edge (width), south edge
+ *  (height), or the south-east corner (both). */
+export type ResizeHandle = 'e' | 's' | 'se'
 
 function KeyIcon({ x, y, color }: { x: number; y: number; color: string }) {
   // Small horizontal key glyph (bow on the left, teeth on the right).
@@ -70,16 +76,62 @@ function PhotoPlaceholder({ x, y }: { x: number; y: number }) {
   )
 }
 
+/** Small drag handles drawn on the selected box's east / south / south-east
+ *  edges. Tagged data-ui so the export pipeline strips them from every output.
+ *  They anchor to the colored header, which is what the size override drives. */
+function ResizeHandles({
+  p,
+  onResizeStart,
+}: {
+  p: PlacedNode
+  onResizeStart: (id: string, handle: ResizeHandle, e: ReactPointerEvent) => void
+}) {
+  const HS = 9
+  const rx = p.x + p.w
+  const by = p.y + p.headerH
+  const spots: { hx: number; hy: number; cursor: string; handle: ResizeHandle }[] = [
+    { hx: rx, hy: p.y + p.headerH / 2, cursor: 'ew-resize', handle: 'e' },
+    { hx: p.x + p.w / 2, hy: by, cursor: 'ns-resize', handle: 's' },
+    { hx: rx, hy: by, cursor: 'nwse-resize', handle: 'se' },
+  ]
+  return (
+    <>
+      {spots.map((s) => (
+        <rect
+          key={s.handle}
+          data-ui="resize"
+          x={s.hx - HS / 2}
+          y={s.hy - HS / 2}
+          width={HS}
+          height={HS}
+          rx={2}
+          fill={brand.white}
+          stroke={brand.marker}
+          strokeWidth={1.5}
+          style={{ cursor: s.cursor }}
+          onPointerDown={(e) => {
+            e.stopPropagation()
+            onResizeStart(p.node.id, s.handle, e)
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ))}
+    </>
+  )
+}
+
 function NodeBox({
   p,
   selected,
   onSelect,
   onPointerDown,
+  onResizeStart,
 }: {
   p: PlacedNode
   selected: boolean
   onSelect?: (id: string) => void
   onPointerDown?: (id: string, e: ReactPointerEvent) => void
+  onResizeStart?: (id: string, handle: ResizeHandle, e: ReactPointerEvent) => void
 }) {
   // Matrixed / dotted-line roles render as a white box with a dashed gray
   // outline and dark text, instead of a filled variant color.
@@ -252,6 +304,7 @@ function NodeBox({
           strokeDasharray="5 3"
         />
       )}
+      {selected && onResizeStart && <ResizeHandles p={p} onResizeStart={onResizeStart} />}
     </g>
   )
 }
@@ -296,7 +349,7 @@ function LegendMarkerGlyph({ marker, x, y }: { marker: LegendMarker; x: number; 
   }
 }
 
-export function ChartSvg({ layout, selectedId, onSelect, onNodePointerDown, ariaLabel }: Props) {
+export function ChartSvg({ layout, selectedId, onSelect, onNodePointerDown, onResizeStart, ariaLabel }: Props) {
   const { placed, connectors, zones, comms, legend, title, width, height } = layout
   return (
     <svg
@@ -433,6 +486,7 @@ export function ChartSvg({ layout, selectedId, onSelect, onNodePointerDown, aria
           selected={p.node.id === selectedId}
           onSelect={onSelect}
           onPointerDown={onNodePointerDown}
+          onResizeStart={onResizeStart}
         />
       ))}
 

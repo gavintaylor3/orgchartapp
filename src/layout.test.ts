@@ -185,6 +185,37 @@ describe('density', () => {
   })
 })
 
+describe('size overrides', () => {
+  const build = (over: { width?: number; height?: number }): OrgChart => ({
+    version: 1,
+    meta: { title: 'S', showTitle: true },
+    roots: [{ id: 'a', title: 'Alpha', variant: 'primary', ...over }],
+    groups: [],
+    comms: [],
+    legend: [],
+  })
+  const box = (chart: OrgChart) => layoutChart(chart).placed.find((p) => p.node.id === 'a')!
+
+  it('applies a width override to the placed box', () => {
+    expect(box(build({ width: 320 })).w).toBe(320)
+    expect(box(build({})).w).toBeLessThan(320)
+  })
+
+  it('grows a box to an explicit height override', () => {
+    const natural = box(build({})).headerH
+    const tall = box(build({ height: natural + 100 }))
+    expect(tall.headerH).toBe(natural + 100)
+    expect(tall.totalH).toBeGreaterThan(natural)
+  })
+
+  it('never shrinks a box below the height its text needs', () => {
+    const natural = box(build({})).headerH
+    // A height override smaller than the natural content height is ignored, so
+    // a proposal box can never clip a name.
+    expect(box(build({ height: 1 })).headerH).toBe(natural)
+  })
+})
+
 describe('manual position overrides', () => {
   const chartWith = (pos?: { x: number; y: number }): OrgChart => ({
     version: 1,

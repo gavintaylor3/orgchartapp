@@ -49,8 +49,15 @@ Your working chart autosaves to localStorage.
      are mapped onto Astrion variants (leader → Force, leads → Sky, portfolios →
      Daylight). Names and titles are starting points — edit them per proposal.
 2. **Click any box** (in the chart or the tree) to edit its title, person name,
-   style, bullets, detail rows, badges, photo placeholder, and width.
+   style, bullets, detail rows, badges, photo placeholder, and size.
    Add children/siblings, reorder, or delete from the same panel.
+   **Resize a box** by dragging the handles on its right edge (width), bottom
+   edge (height), or corner (both) — hold Alt for pixel-fine steps, or type
+   exact px in the inspector and hit "Reset size to auto" to clear it. Shrinking
+   width re-wraps the text; height only grows a box past the room its own text
+   needs, so a name can never be clipped. **Move a box** by dragging its body
+   (arrow keys nudge the selected box; Shift for fine steps). Both size and
+   position are saved in the chart JSON, so a laid-out chart reopens identically.
    Drag the divider between the side panel and the canvas to **resize the panel**
    (double-click it to reset); the width is remembered between sessions.
 3. **Chart tab** — chart title, group zones (tinted or dashed, pick member boxes),
@@ -110,6 +117,8 @@ use Supernova (gold) and Silver (gray).
         { "label": "Interface:", "text": "Customer CO, COR, CC" }
       ],
       "childLayout": "row",            // row (side by side) | stack (capability list)
+      "width": 190,                     // optional px width override (drag the edge handle)
+      "height": 60,                     // optional px height override (drag the bottom handle)
       "children": []
     }
   ],
@@ -133,8 +142,10 @@ Tips:
 - `dashed: true` renders a box as a matrixed / dotted-line role: a white box
   with a dashed gray outline instead of a filled variant color (used for the
   Campaign Lead / BDE / support roles in the Astrion mission-pillar charts).
-- Widths default to the theme metric; set `width` per node when a box needs to
-  carry more text.
+- Widths default to the theme metric; set `width` per node (or drag the box's
+  edge handle) when a box needs to carry more or less text. `height` is optional
+  and only grows a box past the space its content needs — useful to line up box
+  heights across a row. Both default to auto when omitted.
 
 ## Project layout
 
