@@ -8,12 +8,22 @@ import {
   useRef,
   useState,
 } from 'react'
-import { ChartSvg } from './ChartSvg'
+import { ChartSvg, type ResizeHandle } from './ChartSvg'
 import { copyPngToClipboard, copySvgToClipboard, exportJson, exportPng, exportSvg } from './export'
 import { exportPdf } from './pdf'
 import { exportPptx } from './pptx'
 import { layoutChart, previewDrag } from './layout'
-import { deleteNode, duplicateNode, normalizeChart, setNodePos, type OrgChart } from './model'
+import {
+  deleteNode,
+  duplicateNode,
+  MIN_BOX_HEIGHT,
+  MIN_BOX_WIDTH,
+  normalizeChart,
+  setNodePos,
+  setNodeSize,
+  updateNode,
+  type OrgChart,
+} from './model'
 import { Minimap, type Viewport } from './Minimap'
 import { type Anchor, NodeToolbar } from './NodeToolbar'
 import { SidePanel } from './SidePanel'
@@ -80,6 +90,9 @@ export default function App() {
   const [panning, setPanning] = useState(false)
   // Live position while a box is being dragged (not yet committed to history).
   const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(null)
+  // Live size while a box is being resized (not yet committed to history). Only
+  // the dimension(s) the active handle controls are present.
+  const [resize, setResize] = useState<{ id: string; width?: number; height?: number } | null>(null)
   const [copyState, setCopyState] = useState<'idle' | 'done' | 'error'>('idle')
   const [copySvgState, setCopySvgState] = useState<'idle' | 'done' | 'error'>('idle')
   const svgHostRef = useRef<HTMLDivElement>(null)
@@ -201,11 +214,18 @@ export default function App() {
   const layout = useMemo(() => layoutChart(chart), [chart])
   // While dragging, derive a cheap preview from the committed layout (reusing
   // untouched boxes by reference) so the drag stays smooth on large charts and
-  // never touches undo history. `view` is what gets rendered and measured.
-  const view = useMemo(
-    () => (drag ? previewDrag(chart, layout, drag.id, drag.x, drag.y) : layout),
-    [chart, layout, drag],
-  )
+  // never touches undo history. Resizing re-runs the layout with the trial size
+  // applied, so neighbors reflow live. `view` is what gets rendered/measured.
+  const view = useMemo(() => {
+    if (resize) {
+      const size: { width?: number; height?: number } = {}
+      if (resize.width != null) size.width = resize.width
+      if (resize.height != null) size.height = resize.height
+      return layoutChart(updateNode(chart, resize.id, size))
+    }
+    if (drag) return previewDrag(chart, layout, drag.id, drag.x, drag.y)
+    return layout
+  }, [chart, layout, drag, resize])
 
   // Zoom the whole chart to fit the visible canvas, then scroll to the origin.
   const fitToScreen = useCallback(() => {
@@ -563,6 +583,71 @@ export default function App() {
     [layout.placed, spaceHeld, chart, setChart],
   )
 
+  // Drag a resize handle to give a box a manual width / height. Mirrors the move
+  // gesture: tracked on the window, previewed live, committed as one undo step.
+  // The east handle sets width, the south handle sets height, the corner sets
+  // both. Height can only grow past the box's text, so a name is never clipped.
+  const onResizeStart = useCallback(
+    (id: string, handle: ResizeHandle, e: ReactPointerEvent<Element>) => {
+      nodeMovedRef.current = false
+      if (e.button !== 0 || spaceHeld || draggingRef.current) return
+      const p = view.placed.find((n) => n.node.id === id)
+      if (!p) return
+      e.stopPropagation()
+      setSelectedId(id)
+      draggingRef.current = true
+      const startX = e.clientX
+      const startY = e.clientY
+      const baseW = p.w
+      const baseH = p.headerH
+      const baseChart = chart
+      const commit = setChart
+      const doW = handle === 'e' || handle === 'se'
+      const doH = handle === 's' || handle === 'se'
+      let moved = false
+      let curW = baseW
+      let curH = baseH
+      let raf = 0
+      const flush = () => {
+        raf = 0
+        setResize({ id, ...(doW ? { width: curW } : {}), ...(doH ? { height: curH } : {}) })
+      }
+      const onMove = (ev: PointerEvent) => {
+        const dxPx = ev.clientX - startX
+        const dyPx = ev.clientY - startY
+        if (!moved && Math.abs(dxPx) + Math.abs(dyPx) < 4) return
+        if (!moved) {
+          moved = true
+          document.body.style.userSelect = 'none'
+          document.body.style.cursor = handle === 'se' ? 'nwse-resize' : doW ? 'ew-resize' : 'ns-resize'
+        }
+        const z = zoomRef.current
+        const step = ev.altKey ? 1 : SNAP
+        if (doW) curW = Math.max(MIN_BOX_WIDTH, Math.round((baseW + dxPx / z) / step) * step)
+        if (doH) curH = Math.max(MIN_BOX_HEIGHT, Math.round((baseH + dyPx / z) / step) * step)
+        if (!raf) raf = requestAnimationFrame(flush)
+      }
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        window.removeEventListener('pointercancel', onUp)
+        if (raf) cancelAnimationFrame(raf)
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
+        draggingRef.current = false
+        if (moved) {
+          nodeMovedRef.current = true
+          commit(setNodeSize(baseChart, id, { ...(doW ? { width: curW } : {}), ...(doH ? { height: curH } : {}) }))
+        }
+        setResize(null)
+      }
+      window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerup', onUp)
+      window.addEventListener('pointercancel', onUp)
+    },
+    [view.placed, spaceHeld, chart, setChart],
+  )
+
   // Keyboard nudge: arrow keys move the selected box (Shift = 1px fine steps),
   // giving keyboard users the manual-position capability that dragging provides.
   const onCanvasKeyDown = useCallback(
@@ -802,6 +887,7 @@ export default function App() {
                   selectedId={selectedId}
                   onSelect={selectNode}
                   onNodePointerDown={onNodePointerDown}
+                  onResizeStart={onResizeStart}
                   ariaLabel={`${chart.meta.title || 'Organization'} org chart, ${view.placed.length} ${view.placed.length === 1 ? 'box' : 'boxes'}`}
                 />
               </div>

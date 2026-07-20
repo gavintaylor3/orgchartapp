@@ -8,9 +8,12 @@ import {
   edgeArrow,
   emptyChart,
   findNode,
+  MIN_BOX_HEIGHT,
+  MIN_BOX_WIDTH,
   normalizeChart,
   sanitizeColors,
   setNodePos,
+  setNodeSize,
   uid,
 } from './model'
 import type { OrgChart } from './model'
@@ -129,7 +132,53 @@ describe('setNodePos', () => {
   })
 })
 
+describe('setNodeSize', () => {
+  it('sets width and height independently and clamps to the minimums', () => {
+    const base = emptyChart()
+    const id = base.roots[0].id
+    const wide = setNodeSize(base, id, { width: 300 })
+    expect(findNode(wide, id)?.width).toBe(300)
+    // Height was not passed, so it stays untouched (undefined).
+    expect(findNode(wide, id)?.height).toBeUndefined()
+
+    const tall = setNodeSize(wide, id, { height: 120 })
+    expect(findNode(tall, id)?.width).toBe(300)
+    expect(findNode(tall, id)?.height).toBe(120)
+
+    // Below-minimum values are clamped, not rejected.
+    const tiny = setNodeSize(base, id, { width: 5, height: 1 })
+    expect(findNode(tiny, id)?.width).toBe(MIN_BOX_WIDTH)
+    expect(findNode(tiny, id)?.height).toBe(MIN_BOX_HEIGHT)
+  })
+
+  it('clears a dimension with null and leaves an omitted one alone', () => {
+    const base = setNodeSize(emptyChart(), emptyChart().roots[0].id, {})
+    const id = base.roots[0].id
+    const sized = setNodeSize(base, id, { width: 240, height: 90 })
+    const clearedW = setNodeSize(sized, id, { width: null })
+    expect(findNode(clearedW, id)?.width).toBeUndefined()
+    expect(findNode(clearedW, id)?.height).toBe(90)
+    // The source chart is never mutated.
+    expect(findNode(sized, id)?.width).toBe(240)
+  })
+})
+
 describe('normalizeChart', () => {
+  it('drops malformed size overrides', () => {
+    const chart = normalizeChart({
+      roots: [
+        { id: 'a', title: 'A', variant: 'primary', width: 200, height: 80 },
+        { id: 'b', title: 'B', variant: 'primary', width: Number.NaN, height: -5 },
+        { id: 'c', title: 'C', variant: 'primary', width: 0 },
+      ],
+    })
+    expect(findNode(chart, 'a')?.width).toBe(200)
+    expect(findNode(chart, 'a')?.height).toBe(80)
+    expect(findNode(chart, 'b')?.width).toBeUndefined()
+    expect(findNode(chart, 'b')?.height).toBeUndefined()
+    expect(findNode(chart, 'c')?.width).toBeUndefined()
+  })
+
   it('drops a manual position with non-finite coordinates', () => {
     const chart = normalizeChart({
       roots: [

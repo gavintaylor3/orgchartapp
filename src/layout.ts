@@ -164,6 +164,9 @@ function measureNode(node: OrgNode, vertical: boolean, g: LayoutGaps): Measured 
       nameLines.length * M.nameLineH +
       (bulletLines.length ? 6 + bulletLines.length * M.bulletLineH : 0)
     headerH = Math.max(headerH, node.photo ? 52 : M.minHeaderH)
+    // A manual height override can only grow the box: it never drops below the
+    // height the box's own text needs, so a resized box can't clip a name.
+    if (node.height && Number.isFinite(node.height)) headerH = Math.max(headerH, node.height)
   }
 
   const detailBlocks: DetailBlock[] = []

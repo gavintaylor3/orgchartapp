@@ -22,6 +22,8 @@ import {
   deleteNode,
   edgeArrow,
   findNode,
+  MIN_BOX_HEIGHT,
+  MIN_BOX_WIDTH,
   moveNode,
   normalizeChart,
   setNodePos,
@@ -243,9 +245,27 @@ function NodeEditor({ chart, onChange, selectedId, onSelect }: Props) {
             type="number"
             value={node.width ?? ''}
             placeholder="190"
-            onChange={(e) => patch({ width: e.target.value ? Math.max(80, Number(e.target.value)) : undefined })}
+            onChange={(e) => patch({ width: e.target.value ? Math.max(MIN_BOX_WIDTH, Number(e.target.value)) : undefined })}
           />
         </label>
+        <label>Height (px, blank = auto)
+          <input
+            type="number"
+            value={node.height ?? ''}
+            placeholder="auto"
+            onChange={(e) => patch({ height: e.target.value ? Math.max(MIN_BOX_HEIGHT, Number(e.target.value)) : undefined })}
+          />
+        </label>
+      </div>
+      {(node.width || node.height) && (
+        <div className="btn-row">
+          <button className="sm" onClick={() => patch({ width: undefined, height: undefined })}>
+            ⤺ Reset size to auto
+          </button>
+          <span className="hint">Or drag the handles on the selected box to resize it.</span>
+        </div>
+      )}
+      <div className="two-col">
         <label className="check">
           <input type="checkbox" checked={!!node.photo} onChange={(e) => patch({ photo: e.target.checked || undefined })} />
           Photo placeholder
