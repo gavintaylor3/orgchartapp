@@ -333,6 +333,11 @@ function LegendMarkerGlyph({ marker, x, y }: { marker: LegendMarker; x: number; 
     case 'green':
     case 'blue':
     case 'orange':
+    case 'purple':
+    case 'red':
+    case 'gray':
+    case 'water':
+    case 'teal':
       return <rect x={x} y={y} width={16} height={14} fill={zoneFill[marker]} stroke="#BDBDBD" strokeWidth={0.5} />
     case 'dashed':
       return (

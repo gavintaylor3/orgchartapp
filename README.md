@@ -60,7 +60,9 @@ Your working chart autosaves to localStorage.
    position are saved in the chart JSON, so a laid-out chart reopens identically.
    Drag the divider between the side panel and the canvas to **resize the panel**
    (double-click it to reset); the width is remembered between sessions.
-3. **Chart tab** — chart title, group zones (tinted or dashed, pick member boxes),
+3. **Chart tab** — chart title, group zones (eight brand tints — green, blue,
+   orange, purple, red, gray, water, teal — or a dashed container, pick member
+   boxes; the zone label sits clear of the boxes it wraps),
    communication lines between any two boxes, legend items, a **glossary / terms**
    panel (define the acronyms and LCATs used on the chart; rename the heading to
    "Acronyms", "Key Terms", etc.), and extra independent trees/columns.

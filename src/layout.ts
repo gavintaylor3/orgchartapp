@@ -395,6 +395,20 @@ const GLOSSARY_ENTRY_GAP = 7
 // noticeable overshoot.
 const TITLE_BAR_SCALE = 0.9
 
+/** Dedicated band (px) reserved for a group-zone label so its title clears the
+ *  member boxes instead of butting against them. Added on the label's side of
+ *  the zone: below the boxes for tinted zones, above them for dashed frames. */
+const ZONE_LABEL_H = 16
+
+/** Vertical offset of the content top: the canvas padding, plus room for the
+ *  chart title, plus (when a dashed group carries a label) enough room that its
+ *  top label never clips against the canvas edge on the first row. */
+function contentTop(chart: OrgChart, gaps: LayoutGaps): number {
+  const base = gaps.canvasPad + (chart.meta.showTitle && chart.meta.title.trim() ? 44 : 0)
+  const hasTopLabel = chart.groups.some((g) => g.style === 'dashed' && !!g.label?.trim())
+  return hasTopLabel ? Math.max(base, gaps.canvasPad + gaps.zonePad + ZONE_LABEL_H) : base
+}
+
 /** Shared tail: build zones, edges, legend, title, and bounds from already
  *  positioned boxes + connectors. Used by every layout strategy. */
 function assemble(chart: OrgChart, placed: PlacedNode[], connectors: string[], gaps: LayoutGaps): Layout {
@@ -422,9 +436,19 @@ function assemble(chart: OrgChart, placed: PlacedNode[], connectors: string[], g
       y2 = Math.max(y2, b.y + b.totalH)
     }
     if (x1 === Infinity) continue
+    // Reserve a label band on the side the title sits: below for tinted zones
+    // (label at the bottom), above for dashed frames (label at the top). The
+    // band widens the zone so the title clears the boxes it wraps.
+    const band = g.label && g.label.trim() ? ZONE_LABEL_H : 0
+    const topBand = g.style === 'dashed' ? band : 0
     zones.push({
       group: g,
-      rect: { x: x1 - gaps.zonePad, y: y1 - gaps.zonePad, w: x2 - x1 + 2 * gaps.zonePad, h: y2 - y1 + 2 * gaps.zonePad },
+      rect: {
+        x: x1 - gaps.zonePad,
+        y: y1 - gaps.zonePad - topBand,
+        w: x2 - x1 + 2 * gaps.zonePad,
+        h: y2 - y1 + 2 * gaps.zonePad + band,
+      },
     })
   }
 
@@ -615,7 +639,7 @@ function layoutRadial(chart: OrgChart): Layout {
   const placed: PlacedNode[] = []
   const connectors: string[] = []
   const ox = g.canvasPad
-  const oy = g.canvasPad + (chart.meta.showTitle && chart.meta.title.trim() ? 44 : 0)
+  const oy = contentTop(chart, g)
   let clusterLeft = 0
 
   // A box sits at an arbitrary angle on its ring but is never rotated, so its
@@ -855,7 +879,7 @@ function layoutLayered(chart: OrgChart): Layout {
 
   // Row Y offsets (each row is as tall as its tallest box).
   const ox = g.canvasPad
-  const oy = g.canvasPad + (chart.meta.showTitle && chart.meta.title.trim() ? 44 : 0)
+  const oy = contentTop(chart, g)
   const rowY: number[] = []
   let yCursor = 0
   for (let L = 0; L <= maxLayer; L++) {
@@ -946,7 +970,7 @@ function layoutMatrix(chart: OrgChart): Layout {
   }
 
   const ox = g.canvasPad
-  const oy = g.canvasPad + (chart.meta.showTitle && chart.meta.title.trim() ? 44 : 0)
+  const oy = contentTop(chart, g)
   const colX: number[] = []
   let xCursor = ox
   for (let ci = 0; ci < cols.length; ci++) {
@@ -988,7 +1012,7 @@ function layoutSwimlane(chart: OrgChart): Layout {
   const cols = assignColumns(chart, model)
 
   const ox = g.canvasPad
-  const oy = g.canvasPad + (chart.meta.showTitle && chart.meta.title.trim() ? 44 : 0)
+  const oy = contentTop(chart, g)
   const laneW = cols.map((c) => Math.max(0, ...c.ids.map((id) => measured.get(id)!.w)))
 
   const placed: PlacedNode[] = []
@@ -1030,7 +1054,7 @@ export function layoutChart(chart: OrgChart): Layout {
   // 2) Map logical -> screen for the chosen direction. The title always sits at
   //    the top-left, so content is offset down by its height regardless of flow.
   const ox = g.canvasPad
-  const oy = g.canvasPad + (chart.meta.showTitle && chart.meta.title.trim() ? 44 : 0)
+  const oy = contentTop(chart, g)
   const maxMain = raw.reduce((mx, r) => Math.max(mx, r.main + r.m.mainSize), 0)
 
   const mapX = (cross: number, main: number) =>

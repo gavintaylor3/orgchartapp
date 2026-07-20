@@ -65,6 +65,11 @@ const MARKERS: { value: LegendMarker; label: string }[] = [
   { value: 'green', label: 'Green zone' },
   { value: 'blue', label: 'Blue zone' },
   { value: 'orange', label: 'Orange zone' },
+  { value: 'purple', label: 'Purple zone' },
+  { value: 'red', label: 'Red zone' },
+  { value: 'gray', label: 'Gray zone' },
+  { value: 'water', label: 'Water-blue zone' },
+  { value: 'teal', label: 'Teal zone' },
   { value: 'dashed', label: 'Dashed container' },
   { value: 'comm', label: 'Comm arrow' },
 ]
@@ -105,6 +110,11 @@ const ZONE_STYLES: { value: ZoneStyle; label: string }[] = [
   { value: 'green', label: 'Tint — green' },
   { value: 'blue', label: 'Tint — blue' },
   { value: 'orange', label: 'Tint — orange' },
+  { value: 'purple', label: 'Tint — purple' },
+  { value: 'red', label: 'Tint — red' },
+  { value: 'gray', label: 'Tint — gray' },
+  { value: 'water', label: 'Tint — water blue' },
+  { value: 'teal', label: 'Tint — teal' },
   { value: 'dashed', label: 'Dashed container' },
 ]
 

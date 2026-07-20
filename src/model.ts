@@ -18,6 +18,11 @@ export type LegendMarker =
   | 'green'
   | 'blue'
   | 'orange'
+  | 'purple'
+  | 'red'
+  | 'gray'
+  | 'water'
+  | 'teal'
   | 'dashed'
   | 'comm'
 
