@@ -60,6 +60,13 @@ export const brand = {
   white: '#FFFFFF',
   canvasBg: '#FFFFFF',
 
+  /** U.S. map graphic: land fill, coastline stroke, faint interior state borders.
+   *  Light washes of Astrion Force so the map reads as a soft ground under the
+   *  brand-colored markers, and dark card/label text stays legible. */
+  mapFill: '#ECEAF6',
+  mapStroke: '#B0A8CF',
+  mapBorder: '#CFC9E4',
+
   /**
    * The Sky gradient (Refraction → Daylight → Zenith). Per the brand guide it
    * is always applied starting with green at the left/top.
