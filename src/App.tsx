@@ -24,6 +24,7 @@ import {
   updateNode,
   type OrgChart,
 } from './model'
+import { isMapDocument, normalizeDocument, type ChartDocument } from './document'
 import { Minimap, type Viewport } from './Minimap'
 import { type Anchor, NodeToolbar } from './NodeToolbar'
 import { SidePanel } from './SidePanel'
@@ -76,7 +77,14 @@ function loadSidebarWidth(): number {
   return raw >= SIDEBAR_MIN && raw <= 900 ? raw : SIDEBAR_DEFAULT
 }
 
-export default function App() {
+interface AppProps {
+  /** Switch the app to the U.S. Map document (from the "U.S. Map" menu entry). */
+  onSwitchToMap?: () => void
+  /** Hand a loaded map document up to the router so it flips to map mode. */
+  onLoadForeign?: (doc: ChartDocument) => void
+}
+
+export default function App({ onSwitchToMap, onLoadForeign }: AppProps = {}) {
   const [chart, setChartRaw] = useState<OrgChart>(loadInitial)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
@@ -443,8 +451,13 @@ export default function App() {
     const reader = new FileReader()
     reader.onload = () => {
       try {
-        setChart(normalizeChart(JSON.parse(String(reader.result))))
-        setSelectedId(null)
+        const doc = normalizeDocument(JSON.parse(String(reader.result)))
+        if (isMapDocument(doc)) {
+          onLoadForeign?.(doc) // a map file -> router switches to map mode
+        } else {
+          setChart(doc)
+          setSelectedId(null)
+        }
       } catch (e) {
         window.alert(`Could not load that file: ${e instanceof Error ? e.message : 'invalid JSON'}`)
       }
@@ -708,12 +721,17 @@ export default function App() {
           className="template-select"
           value=""
           aria-label="Load a template"
-          onChange={(e) => e.target.value && loadTemplate(e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value
+            if (v === '__map__') onSwitchToMap?.()
+            else if (v) loadTemplate(v)
+          }}
         >
           <option value="">New from template…</option>
           {templates.map((t) => (
             <option key={t.key} value={t.key}>{t.label}</option>
           ))}
+          {onSwitchToMap && <option value="__map__">🗺 U.S. Map (LCATs by location)…</option>}
         </select>
 
         <div className="spacer" />

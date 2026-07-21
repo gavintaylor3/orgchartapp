@@ -110,8 +110,9 @@ function normalizeEdge(e: CommLink): CommLink {
 }
 
 /** Coerce one untrusted glossary entry to the current shape, or drop it (return
- *  null) when it carries neither a term nor a definition. */
-function normalizeGlossaryTerm(input: unknown): GlossaryTerm | null {
+ *  null) when it carries neither a term nor a definition. Shared with the map
+ *  document normalizer so both kinds validate glossaries identically. */
+export function normalizeGlossaryTerm(input: unknown): GlossaryTerm | null {
   if (!input || typeof input !== 'object') return null
   const g = input as Partial<GlossaryTerm>
   const term = typeof g.term === 'string' ? g.term : ''
@@ -153,6 +154,9 @@ export type Density = 'comfortable' | 'compact'
 
 export interface OrgChart {
   version: 1
+  /** Document discriminator. Absent or 'org' is an org chart; 'map' is a MapChart
+   *  (see mapModel.ts). Lets one loader route to the right document type. */
+  kind?: 'org'
   meta: {
     title: string
     showTitle: boolean
